@@ -168,6 +168,7 @@ contract NFATFacility is ERC721 {
 
     // --- Redeem Functions ---
 
+    // Note: the recipient of a transferred NFAT is assumed aware of current and future planned funding, including potential front-running
     function fund(uint256 tokenId, uint256 amount) external {
         require(amount > 0, "NFATFacility/zero-amount");
         require(_ownerOf(tokenId) != address(0), "NFATFacility/invalid-token");
@@ -199,7 +200,7 @@ contract NFATFacility is ERC721 {
 
     // --- Rescue Functions ---
 
-    // Note: when token == gem, prefer rescueDeposit/rescueFunded to rescue tracked balances
+    // Note: In order to rescue gem balances tracked by the `deposits` or `funded` mappings, prefer using rescueDeposit/rescueFunded over this function
     function rescue(address token, address to, uint256 amount) external auth {
         GemLike(token).transfer(to, amount);
         emit Rescue(token, to, amount);
