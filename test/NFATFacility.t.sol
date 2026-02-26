@@ -224,6 +224,13 @@ contract NFATFacilityTest is DssTest {
         assertEq(facility.deposits(prime1), depositsBefore);
     }
 
+    function testRevertSubscribeStopped() public {
+        vm.prank(pauseProxy); facility.stop();
+
+        vm.expectRevert("NFATFacility/stopped");
+        vm.prank(prime1); facility.subscribe(100 ether, "");
+    }
+
     function testWithdraw() public {
         _subscribe(prime1, 100 ether);
 
@@ -286,6 +293,24 @@ contract NFATFacilityTest is DssTest {
         assertEq(susds.balanceOf(almProxy), almBalBefore);
     }
 
+    function testIssueWithIdentityNetwork() public {
+        vm.prank(pauseProxy); facility.file("identityNetwork", address(idNet));
+        idNet.setMember(prime1, true);
+
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 50 ether);
+
+        assertEq(facility.ownerOf(tokenId), prime1);
+    }
+
+    function testRevertIssueStopped() public {
+        _subscribe(prime1, 100 ether);
+        vm.prank(pauseProxy); facility.stop();
+
+        vm.expectRevert("NFATFacility/stopped");
+        vm.prank(operator); facility.issue(prime1, 1, 50 ether);
+    }
+
     function testRevertIssueTokenIdZero() public {
         _subscribe(prime1, 100 ether);
 
@@ -298,24 +323,6 @@ contract NFATFacilityTest is DssTest {
 
         vm.expectRevert("NFATFacility/insufficient-deposits");
         vm.prank(operator); facility.issue(prime1, 1, 101 ether);
-    }
-
-    function testRevertIssueStopped() public {
-        _subscribe(prime1, 100 ether);
-        vm.prank(pauseProxy); facility.stop();
-
-        vm.expectRevert("NFATFacility/stopped");
-        vm.prank(operator); facility.issue(prime1, 1, 50 ether);
-    }
-
-    function testIssueWithIdentityNetwork() public {
-        vm.prank(pauseProxy); facility.file("identityNetwork", address(idNet));
-        idNet.setMember(prime1, true);
-
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 50 ether);
-
-        assertEq(facility.ownerOf(tokenId), prime1);
     }
 
     function testRevertIssueTargetNotMember() public {
@@ -349,9 +356,16 @@ contract NFATFacilityTest is DssTest {
         assertEq(facility.funded(tokenId), 70 ether);
     }
 
-    function testRevertFundInvalidToken() public {
-        vm.expectRevert("NFATFacility/invalid-token");
-        facility.fund(999, 1 ether);
+    function testRevertFundStopped() public {
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+        vm.prank(pauseProxy); facility.stop();
+
+        deal(address(susds), address(this), 50 ether);
+        susds.approve(address(facility), 50 ether);
+
+        vm.expectRevert("NFATFacility/stopped");
+        facility.fund(tokenId, 50 ether);
     }
 
     function testRevertFundZeroAmount() public {
@@ -360,6 +374,11 @@ contract NFATFacilityTest is DssTest {
 
         vm.expectRevert("NFATFacility/zero-amount");
         facility.fund(tokenId, 0);
+    }
+
+    function testRevertFundInvalidToken() public {
+        vm.expectRevert("NFATFacility/invalid-token");
+        facility.fund(999, 1 ether);
     }
 
     // --- Redeem ---
@@ -386,6 +405,16 @@ contract NFATFacilityTest is DssTest {
         assertEq(susds.balanceOf(prime1), balBefore + 80 ether);
     }
 
+    function testRevertRedeemStopped() public {
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+        _fundToken(tokenId, 50 ether);
+        vm.prank(pauseProxy); facility.stop();
+
+        vm.expectRevert("NFATFacility/stopped");
+        vm.prank(prime1); facility.redeem(tokenId, 50 ether);
+    }
+
     function testRevertRedeemZeroAmount() public {
         vm.expectRevert("NFATFacility/zero-amount");
         vm.prank(prime1); facility.redeem(0, 0);
@@ -400,6 +429,15 @@ contract NFATFacilityTest is DssTest {
         vm.prank(prime1); facility.redeem(tokenId, 11 ether);
     }
 
+    function testRevertRedeemNotOwner() public {
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+        _fundToken(tokenId, 50 ether);
+
+        vm.expectRevert("NFATFacility/not-owner");
+        vm.prank(prime2); facility.redeem(tokenId, 50 ether);
+    }
+
     function testRevertRedeemNotMember() public {
         vm.prank(pauseProxy); facility.file("identityNetwork", address(idNet));
         idNet.setMember(prime1, true);
@@ -412,15 +450,6 @@ contract NFATFacilityTest is DssTest {
 
         vm.expectRevert("NFATFacility/not-member");
         vm.prank(prime1); facility.redeem(tokenId, 50 ether);
-    }
-
-    function testRevertRedeemNotOwner() public {
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 100 ether);
-        _fundToken(tokenId, 50 ether);
-
-        vm.expectRevert("NFATFacility/not-owner");
-        vm.prank(prime2); facility.redeem(tokenId, 50 ether);
     }
 
     // --- Rescue ---

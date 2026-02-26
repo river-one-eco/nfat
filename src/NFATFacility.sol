@@ -142,7 +142,7 @@ contract NFATFacility is ERC721 {
     // --- Queue Functions ---
 
     // Note: amount = 0 is allowed to emit updated data without depositing; data is arbitrary and intended for off-chain agreements
-    function subscribe(uint256 amount, bytes calldata data) external {
+    function subscribe(uint256 amount, bytes calldata data) external notStopped {
         deposits[msg.sender] += amount;
         if (amount > 0) gem.transferFrom(msg.sender, address(this), amount);
         emit Subscribe(msg.sender, amount, data);
@@ -169,7 +169,7 @@ contract NFATFacility is ERC721 {
     // --- Redeem Functions ---
 
     // Note: the recipient of a transferred NFAT is assumed aware of current and future planned funding, including potential front-running
-    function fund(uint256 tokenId, uint256 amount) external {
+    function fund(uint256 tokenId, uint256 amount) external notStopped {
         require(amount > 0, "NFATFacility/zero-amount");
         require(_ownerOf(tokenId) != address(0), "NFATFacility/invalid-token");
         funded[tokenId] += amount;
@@ -177,7 +177,7 @@ contract NFATFacility is ERC721 {
         emit Fund(tokenId, msg.sender, amount);
     }
 
-    function redeem(uint256 tokenId, uint256 amount) external {
+    function redeem(uint256 tokenId, uint256 amount) external notStopped {
         require(amount > 0, "NFATFacility/zero-amount");
         require(funded[tokenId] >= amount, "NFATFacility/insufficient-funded");
         require(msg.sender == _ownerOf(tokenId), "NFATFacility/not-owner");
