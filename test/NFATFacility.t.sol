@@ -14,8 +14,8 @@ interface SUsdsLike {
 
 contract IdentityNetworkMock {
     mapping(address => bool) public members;
-    function setMember(address account, bool status) external { members[account] = status; }
-    function isMember(address account) external view returns (bool) { return members[account]; }
+    function setMember(address usr, bool status) external { members[usr] = status; }
+    function isMember(address usr) external view returns (bool) { return members[usr]; }
 }
 
 contract ERC721ReceiverMock {
@@ -104,7 +104,7 @@ contract NFATFacilityTest is DssTest {
 
     function _issue(address target, uint256 amount) internal returns (uint256 tokenId) {
         tokenId = vm.randomUint();
-        vm.prank(operator); facility.issue(target, amount, tokenId);
+        vm.prank(operator); facility.issue(target, tokenId, amount);
     }
 
     function _fundToken(uint256 tokenId, uint256 amount) internal {
@@ -184,7 +184,7 @@ contract NFATFacilityTest is DssTest {
     function testStopStart() public {
         _subscribe(prime1, 100 ether);
 
-        vm.prank(operator); facility.issue(prime1, 25 ether, 0);
+        vm.prank(operator); facility.issue(prime1, 1, 25 ether);
 
         vm.expectEmit(true, true, true, true);
         emit Stop();
@@ -192,14 +192,14 @@ contract NFATFacilityTest is DssTest {
         assertTrue(facility.stopped());
 
         vm.expectRevert("NFATFacility/stopped");
-        vm.prank(operator); facility.issue(prime1, 25 ether, 1);
+        vm.prank(operator); facility.issue(prime1, 2, 25 ether);
 
         vm.expectEmit(true, true, true, true);
         emit Start();
         vm.prank(pauseProxy); facility.start();
         assertTrue(!facility.stopped());
 
-        vm.prank(operator); facility.issue(prime1, 25 ether, 1);
+        vm.prank(operator); facility.issue(prime1, 2, 25 ether);
     }
 
     // --- Queue ---
@@ -273,18 +273,25 @@ contract NFATFacilityTest is DssTest {
         uint256 depositsBefore = facility.deposits(prime1);
         uint256 almBalBefore   = susds.balanceOf(almProxy);
 
-        vm.prank(operator); facility.issue(prime1, 0, 0);
+        vm.prank(operator); facility.issue(prime1, 1, 0 ether);
 
-        assertEq(facility.ownerOf(0), prime1);
+        assertEq(facility.ownerOf(1), prime1);
         assertEq(facility.deposits(prime1), depositsBefore);
         assertEq(susds.balanceOf(almProxy), almBalBefore);
+    }
+
+    function testRevertIssueTokenIdZero() public {
+        _subscribe(prime1, 100 ether);
+
+        vm.expectRevert("NFATFacility/token-id-zero");
+        vm.prank(operator); facility.issue(prime1, 0, 50 ether);
     }
 
     function testRevertIssueInsufficientDeposits() public {
         _subscribe(prime1, 100 ether);
 
         vm.expectRevert("NFATFacility/insufficient-deposits");
-        vm.prank(operator); facility.issue(prime1, 101 ether, 0);
+        vm.prank(operator); facility.issue(prime1, 1, 101 ether);
     }
 
     function testRevertIssueStopped() public {
@@ -292,7 +299,7 @@ contract NFATFacilityTest is DssTest {
         vm.prank(pauseProxy); facility.stop();
 
         vm.expectRevert("NFATFacility/stopped");
-        vm.prank(operator); facility.issue(prime1, 50 ether, 0);
+        vm.prank(operator); facility.issue(prime1, 1, 50 ether);
     }
 
     function testIssueWithIdentityNetwork() public {
@@ -311,7 +318,7 @@ contract NFATFacilityTest is DssTest {
         _subscribe(prime1, 100 ether);
 
         vm.expectRevert("NFATFacility/not-member");
-        vm.prank(operator); facility.issue(prime1, 50 ether, 0);
+        vm.prank(operator); facility.issue(prime1, 1, 50 ether);
     }
 
     // --- Fund ---

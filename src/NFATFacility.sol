@@ -24,33 +24,21 @@ interface GemLike {
 }
 
 interface IdentityNetworkLike {
-    function isMember(address account) external view returns (bool);
+    function isMember(address usr) external view returns (bool);
 }
 
 contract NFATFacility is ERC721 {
 
-    // --- Immutables ---
+    mapping(address usr       => uint256 allowed) public wards;
+    mapping(address usr       => uint256 allowed) public buds;     // Operator(s)
+    mapping(address usr       => uint256 allowed) public cops;     // Freezers
+    mapping(address depositor => uint256 amount)  public deposits; 
+    mapping(uint256 tokenId   => uint256 amount)  public funded;
+    bool                public stopped;
+    IdentityNetworkLike public identityNetwork;
 
     GemLike public immutable gem;        // Underlying asset
     address public immutable recipient;  // Destination of funds claimed by the operator
-
-    // --- Access Control Storage ---
-
-    mapping(address usr => uint256 allowed) public wards;
-    mapping(address usr => uint256 allowed) public buds;  // Operator(s)
-    mapping(address usr => uint256 allowed) public cops;  // Freezers
-    bool    public stopped;
-    address public identityNetwork;
-
-    // --- Queue Storage ---
-
-    mapping(address depositor => uint256 amount) public deposits;
-
-    // --- Redeem Storage ---
-
-    mapping(uint256 tokenId => uint256 amount) public funded;
-
-    // --- Events: Access Control ---
 
     event Rely(address indexed usr);
     event Deny(address indexed usr);
@@ -61,20 +49,11 @@ contract NFATFacility is ERC721 {
     event Stop();
     event Start();
     event File(bytes32 indexed what, address data);
-
-    // --- Events: Queue ---
-
     event Subscribe(address indexed depositor, uint256 amount);
     event Withdraw(address indexed depositor, uint256 amount);
     event Issue(address indexed target, uint256 indexed tokenId, uint256 amount);
-
-    // --- Events: Redeem ---
-
     event Fund(uint256 indexed tokenId, address indexed funder, uint256 amount);
     event Redeem(uint256 indexed tokenId, uint256 amount);
-
-    // --- Events: Rescue ---
-
     event Rescue(address indexed token, address indexed to, uint256 amount);
     event RescueDeposit(address indexed depositor, address indexed to, uint256 amount);
     event RescueFunded(uint256 indexed tokenId, address indexed to, uint256 amount);
@@ -155,7 +134,7 @@ contract NFATFacility is ERC721 {
     }
 
     function file(bytes32 what, address data) external auth {
-        if (what == "identityNetwork") identityNetwork = data;
+        if (what == "identityNetwork") identityNetwork = IdentityNetworkLike(data);
         else revert("NFATFacility/file-unrecognized-param");
         emit File(what, data);
     }
@@ -178,7 +157,8 @@ contract NFATFacility is ERC721 {
     }
 
     // Note: amount = 0 is allowed (mint NFAT without moving funds)
-    function issue(address target, uint256 amount, uint256 tokenId) external toll notStopped {
+    function issue(address target, uint256 tokenId, uint256 amount) external toll notStopped {
+        require(tokenId != 0, "NFATFacility/token-id-zero");
         require(deposits[target] >= amount, "NFATFacility/insufficient-deposits");
         unchecked { deposits[target] -= amount; }
         _mint(target, tokenId); // identity network check in _update
@@ -189,8 +169,8 @@ contract NFATFacility is ERC721 {
     // --- Redeem Functions ---
 
     function fund(uint256 tokenId, uint256 amount) external {
-        require(_ownerOf(tokenId) != address(0), "NFATFacility/invalid-token");
         require(amount > 0, "NFATFacility/zero-amount");
+        require(_ownerOf(tokenId) != address(0), "NFATFacility/invalid-token");
         funded[tokenId] += amount;
         gem.transferFrom(msg.sender, address(this), amount);
         emit Fund(tokenId, msg.sender, amount);
@@ -199,11 +179,10 @@ contract NFATFacility is ERC721 {
     function redeem(uint256 tokenId, uint256 amount) external {
         require(amount > 0, "NFATFacility/zero-amount");
         require(funded[tokenId] >= amount, "NFATFacility/insufficient-funded");
-        address owner = _ownerOf(tokenId);
-        require(msg.sender == owner, "NFATFacility/not-owner");
-        require(identityNetwork == address(0) || IdentityNetworkLike(identityNetwork).isMember(owner), "NFATFacility/not-member");
+        require(msg.sender == _ownerOf(tokenId), "NFATFacility/not-owner");
+        require(address(identityNetwork) == address(0) || identityNetwork.isMember(msg.sender), "NFATFacility/not-member");
         unchecked { funded[tokenId] -= amount; }
-        gem.transfer(owner, amount);
+        gem.transfer(msg.sender, amount);
         emit Redeem(tokenId, amount);
     }
 
@@ -212,7 +191,7 @@ contract NFATFacility is ERC721 {
     // Note: `to` is guaranteed non-zero (OZ reverts before _update when to == address(0), and _burn is never invoked)
     function _update(address to, uint256 tokenId, address auth_) internal override returns (address) {
         require(
-            identityNetwork == address(0) || IdentityNetworkLike(identityNetwork).isMember(to),
+            address(identityNetwork) == address(0) || identityNetwork.isMember(to),
             "NFATFacility/not-member"
         );
         return super._update(to, tokenId, auth_);
