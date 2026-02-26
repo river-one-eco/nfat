@@ -53,6 +53,7 @@ contract NFATFacilityTest is DssTest {
     event Start();
     event Subscribe(address indexed depositor, uint256 amount);
     event Withdraw(address indexed depositor, uint256 amount);
+    event Instruct(address indexed depositor, bytes terms_);
     event Issue(address indexed target, uint256 indexed tokenId, uint256 amount);
     event Fund(uint256 indexed tokenId, address indexed funder, uint256 amount);
     event Redeem(uint256 indexed tokenId, uint256 amount);
@@ -246,6 +247,30 @@ contract NFATFacilityTest is DssTest {
 
         vm.expectRevert("NFATFacility/insufficient-deposits");
         vm.prank(prime1); facility.withdraw(101 ether);
+    }
+
+    // --- Instruct ---
+
+    function testInstruct() public {
+        // Set terms
+        bytes memory terms1 = bytes("sample terms");
+        vm.expectEmit(true, true, true, true);
+        emit Instruct(prime1, terms1);
+        vm.prank(prime1); facility.instruct(terms1);
+        assertEq(facility.terms(prime1), terms1);
+
+        // Replace terms
+        bytes memory terms2 = bytes("updated terms");
+        vm.expectEmit(true, true, true, true);
+        emit Instruct(prime1, terms2);
+        vm.prank(prime1); facility.instruct(terms2);
+        assertEq(facility.terms(prime1), terms2);
+
+        // Clear terms
+        vm.expectEmit(true, true, true, true);
+        emit Instruct(prime1, "");
+        vm.prank(prime1); facility.instruct("");
+        assertEq(facility.terms(prime1).length, 0);
     }
 
     // --- Issue ---

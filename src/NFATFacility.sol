@@ -32,7 +32,8 @@ contract NFATFacility is ERC721 {
     mapping(address usr       => uint256 allowed) public wards;
     mapping(address usr       => uint256 allowed) public buds;     // Operator(s)
     mapping(address usr       => uint256 allowed) public cops;     // Freezers
-    mapping(address depositor => uint256 amount)  public deposits; 
+    mapping(address depositor => uint256 amount)  public deposits;
+    mapping(address depositor => bytes data)      public terms;
     mapping(uint256 tokenId   => uint256 amount)  public funded;
     bool                public stopped;
     IdentityNetworkLike public identityNetwork;
@@ -51,6 +52,7 @@ contract NFATFacility is ERC721 {
     event File(bytes32 indexed what, address data);
     event Subscribe(address indexed depositor, uint256 amount);
     event Withdraw(address indexed depositor, uint256 amount);
+    event Instruct(address indexed depositor, bytes terms_);
     event Issue(address indexed target, uint256 indexed tokenId, uint256 amount);
     event Fund(uint256 indexed tokenId, address indexed funder, uint256 amount);
     event Redeem(uint256 indexed tokenId, uint256 amount);
@@ -146,6 +148,12 @@ contract NFATFacility is ERC721 {
         deposits[msg.sender] += amount;
         gem.transferFrom(msg.sender, address(this), amount);
         emit Subscribe(msg.sender, amount);
+    }
+
+    // Note: terms are not enforced on-chain; the depositor is responsible for keeping them current with their intended deals
+    function instruct(bytes calldata terms_) external {
+        terms[msg.sender] = terms_;
+        emit Instruct(msg.sender, terms_);
     }
 
     function withdraw(uint256 amount) external {
