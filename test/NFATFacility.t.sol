@@ -413,16 +413,16 @@ contract NFATFacilityTest is DssTest {
     // --- Rescue ---
 
     function testRescue() public {
-        address recipient = address(0xBEEF);
+        address rescueTo = address(0xBEEF);
 
         // Rescue gem surplus
         deal(address(susds), address(facility), 100 ether);
 
         vm.expectEmit(true, true, true, true);
-        emit Rescue(address(susds), recipient, 100 ether);
-        vm.prank(pauseProxy); facility.rescue(address(susds), recipient, 100 ether);
+        emit Rescue(address(susds), rescueTo, 100 ether);
+        vm.prank(pauseProxy); facility.rescue(address(susds), rescueTo, 100 ether);
 
-        assertEq(susds.balanceOf(recipient), 100 ether);
+        assertEq(susds.balanceOf(rescueTo), 100 ether);
         assertEq(susds.balanceOf(address(facility)), 0);
 
         // Rescue non-gem token
@@ -430,24 +430,24 @@ contract NFATFacilityTest is DssTest {
         deal(usds, address(facility), 50 ether);
 
         vm.expectEmit(true, true, true, true);
-        emit Rescue(usds, recipient, 50 ether);
-        vm.prank(pauseProxy); facility.rescue(usds, recipient, 50 ether);
+        emit Rescue(usds, rescueTo, 50 ether);
+        vm.prank(pauseProxy); facility.rescue(usds, rescueTo, 50 ether);
 
-        assertEq(SUsdsLike(usds).balanceOf(recipient), 50 ether);
+        assertEq(SUsdsLike(usds).balanceOf(rescueTo), 50 ether);
         assertEq(SUsdsLike(usds).balanceOf(address(facility)), 0);
     }
 
     function testRescueDeposit() public {
         _subscribe(prime1, 100 ether);
 
-        address recipient = address(0xBEEF);
+        address rescueTo = address(0xBEEF);
 
         vm.expectEmit(true, true, true, true);
-        emit RescueDeposit(prime1, recipient, 60 ether);
-        vm.prank(pauseProxy); facility.rescueDeposit(prime1, recipient, 60 ether);
+        emit RescueDeposit(prime1, rescueTo, 60 ether);
+        vm.prank(pauseProxy); facility.rescueDeposit(prime1, rescueTo, 60 ether);
 
         assertEq(facility.deposits(prime1), 40 ether);
-        assertEq(susds.balanceOf(recipient), 60 ether);
+        assertEq(susds.balanceOf(rescueTo), 60 ether);
         assertEq(susds.balanceOf(address(facility)), 40 ether);
     }
 
@@ -463,14 +463,14 @@ contract NFATFacilityTest is DssTest {
         uint256 tokenId = _issue(prime1, 100 ether);
         _fundToken(tokenId, 80 ether);
 
-        address recipient = address(0xBEEF);
+        address rescueTo = address(0xBEEF);
 
         vm.expectEmit(true, true, true, true);
-        emit RescueFunded(tokenId, recipient, 50 ether);
-        vm.prank(pauseProxy); facility.rescueFunded(tokenId, recipient, 50 ether);
+        emit RescueFunded(tokenId, rescueTo, 50 ether);
+        vm.prank(pauseProxy); facility.rescueFunded(tokenId, rescueTo, 50 ether);
 
         assertEq(facility.funded(tokenId), 30 ether);
-        assertEq(susds.balanceOf(recipient), 50 ether);
+        assertEq(susds.balanceOf(rescueTo), 50 ether);
         assertEq(susds.balanceOf(address(facility)), 30 ether);
     }
 

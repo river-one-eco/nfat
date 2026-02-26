@@ -32,12 +32,12 @@ contract NFATFacility is ERC721 {
     // --- Immutables ---
 
     GemLike public immutable gem;        // Underlying asset
-    address public immutable almProxy;   // Destination of funds claimed by the operator
+    address public immutable recipient;  // Destination of funds claimed by the operator
 
     // --- Access Control Storage ---
 
     mapping(address usr => uint256 allowed) public wards;
-    mapping(address usr => uint256 allowed) public buds;  // Operator(s) (lpha-nfat beacon)
+    mapping(address usr => uint256 allowed) public buds;  // Operator(s)
     mapping(address usr => uint256 allowed) public cops;  // Freezers
     bool    public stopped;
     address public identityNetwork;
@@ -103,11 +103,11 @@ contract NFATFacility is ERC721 {
 
     // --- Constructor ---
 
-    constructor(address gem_, address almProxy_, string memory name_, string memory symbol_)
+    constructor(address gem_, address recipient_, string memory name_, string memory symbol_)
         ERC721(name_, symbol_)
     {
         gem = GemLike(gem_);
-        almProxy = almProxy_;
+        recipient = recipient_;
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
     }
@@ -182,7 +182,7 @@ contract NFATFacility is ERC721 {
         require(deposits[target] >= amount, "NFATFacility/insufficient-deposits");
         unchecked { deposits[target] -= amount; }
         _mint(target, tokenId); // identity network check in _update
-        if (amount > 0) gem.transfer(almProxy, amount);
+        if (amount > 0) gem.transfer(recipient, amount);
         emit Issue(target, tokenId, amount);
     }
 
