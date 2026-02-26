@@ -34,6 +34,7 @@ contract NFATFacility is ERC721 {
     mapping(address usr       => uint256 allowed) public cops;     // Freezers
     mapping(address depositor => uint256 amount)  public deposits;
     mapping(uint256 tokenId   => uint256 amount)  public funded;
+    string              public baseURI;
     bool                public stopped;
     IdentityNetworkLike public identityNetwork;
 
@@ -49,6 +50,7 @@ contract NFATFacility is ERC721 {
     event Stop();
     event Start();
     event File(bytes32 indexed what, address data);
+    event File(bytes32 indexed what, string data);
     event Subscribe(address indexed depositor, uint256 amount, bytes data);
     event Withdraw(address indexed depositor, uint256 amount);
     event Issue(address indexed target, uint256 indexed tokenId, uint256 amount);
@@ -139,6 +141,12 @@ contract NFATFacility is ERC721 {
         emit File(what, data);
     }
 
+    function file(bytes32 what, string calldata data) external auth {
+        if (what == "baseURI") baseURI = data;
+        else revert("NFATFacility/file-unrecognized-param");
+        emit File(what, data);
+    }
+
     // --- Queue Functions ---
 
     // Note: amount = 0 is allowed to emit updated data without depositing; data is arbitrary and intended for off-chain agreements
@@ -188,6 +196,10 @@ contract NFATFacility is ERC721 {
     }
 
     // --- ERC-721 Overrides ---
+
+    function _baseURI() internal view override returns (string memory) {
+        return baseURI;
+    }
 
     // Note: `to` is guaranteed non-zero (OZ reverts before _update when to == address(0), and _burn is never invoked)
     function _update(address to, uint256 tokenId, address auth_) internal override returns (address) {

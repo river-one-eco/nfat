@@ -130,6 +130,7 @@ contract NFATFacilityTest is DssTest {
 
     function testFile() public {
         checkFileAddress(address(facility), "NFATFacility", ["identityNetwork"]);
+        checkFileString(address(facility), "NFATFacility", ["baseURI"]);
     }
 
     function testModifiers() public {
@@ -690,6 +691,16 @@ contract NFATFacilityTest is DssTest {
     }
 
     // --- Metadata & ERC-165 ---
+
+    function testTokenURI() public {
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+        assertEq(facility.tokenURI(tokenId), "");
+
+        vm.prank(pauseProxy); facility.file("baseURI", "https://example.com/nfat/");
+
+        assertEq(facility.tokenURI(tokenId), string.concat("https://example.com/nfat/", vm.toString(tokenId)));
+    }
 
     function testMetadataAndERC165() public view {
         assertEq(facility.name(), "Non-Fungible Allocation Token - Halo1");
