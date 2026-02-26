@@ -51,9 +51,8 @@ contract NFATFacilityTest is DssTest {
     event RemoveFreezer(address indexed usr);
     event Stop();
     event Start();
-    event Subscribe(address indexed depositor, uint256 amount);
+    event Subscribe(address indexed depositor, uint256 amount, bytes data);
     event Withdraw(address indexed depositor, uint256 amount);
-    event Instruct(address indexed depositor, bytes terms_);
     event Issue(address indexed target, uint256 indexed tokenId, uint256 amount);
     event Fund(uint256 indexed tokenId, address indexed funder, uint256 amount);
     event Redeem(uint256 indexed tokenId, uint256 amount);
@@ -100,7 +99,7 @@ contract NFATFacilityTest is DssTest {
     // --- Helpers ---
 
     function _subscribe(address who, uint256 amount) internal {
-        vm.prank(who); facility.subscribe(amount);
+        vm.prank(who); facility.subscribe(amount, "");
     }
 
     function _issue(address target, uint256 amount) internal returns (uint256 tokenId) {
@@ -207,16 +206,22 @@ contract NFATFacilityTest is DssTest {
 
     function testSubscribe() public {
         vm.expectEmit(true, true, true, true);
-        emit Subscribe(prime1, 100 ether);
+        emit Subscribe(prime1, 100 ether, "");
         _subscribe(prime1, 100 ether);
 
         assertEq(facility.deposits(prime1), 100 ether);
         assertEq(susds.balanceOf(address(facility)), 100 ether);
     }
 
-    function testRevertSubscribeZeroAmount() public {
-        vm.expectRevert("NFATFacility/zero-amount");
-        vm.prank(prime1); facility.subscribe(0);
+    function testSubscribeZeroAmountWithData() public {
+        bytes memory data = bytes("sample terms");
+        uint256 depositsBefore = facility.deposits(prime1);
+
+        vm.expectEmit(true, true, true, true);
+        emit Subscribe(prime1, 0, data);
+        vm.prank(prime1); facility.subscribe(0, data);
+
+        assertEq(facility.deposits(prime1), depositsBefore);
     }
 
     function testWithdraw() public {
@@ -247,30 +252,6 @@ contract NFATFacilityTest is DssTest {
 
         vm.expectRevert("NFATFacility/insufficient-deposits");
         vm.prank(prime1); facility.withdraw(101 ether);
-    }
-
-    // --- Instruct ---
-
-    function testInstruct() public {
-        // Set terms
-        bytes memory terms1 = bytes("sample terms");
-        vm.expectEmit(true, true, true, true);
-        emit Instruct(prime1, terms1);
-        vm.prank(prime1); facility.instruct(terms1);
-        assertEq(facility.terms(prime1), terms1);
-
-        // Replace terms
-        bytes memory terms2 = bytes("updated terms");
-        vm.expectEmit(true, true, true, true);
-        emit Instruct(prime1, terms2);
-        vm.prank(prime1); facility.instruct(terms2);
-        assertEq(facility.terms(prime1), terms2);
-
-        // Clear terms
-        vm.expectEmit(true, true, true, true);
-        emit Instruct(prime1, "");
-        vm.prank(prime1); facility.instruct("");
-        assertEq(facility.terms(prime1).length, 0);
     }
 
     // --- Issue ---
