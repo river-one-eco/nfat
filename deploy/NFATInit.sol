@@ -20,7 +20,6 @@ import { DssInstance } from "dss-test/MCD.sol";
 
 interface NFATFacilityLike {
     function gem() external view returns (address);
-    function recipient() external view returns (address);
     function file(bytes32, address) external;
     function kiss(address) external;
     function addFreezer(address) external;
@@ -43,26 +42,15 @@ library NFATInit {
     ) internal {
         NFATFacilityLike facility = NFATFacilityLike(facility_);
 
-        // --- Sanity checks ---
+        require(facility.gem() == dss.chainlog.getAddress("SUSDS"), "NFATInit/gem-mismatch");
 
-        require(facility.gem()      == dss.chainlog.getAddress("SUSDS"), "NFATInit/gem-mismatch");
-        require(facility.recipient() == cfg.almProxy,                     "NFATInit/recipient-mismatch");
-
-        // --- Configure identity network ---
-
+        facility.file("recipient", cfg.almProxy);
         facility.file("identityNetwork", cfg.identityNetwork);
-
-        // --- Configure freezers ---
 
         for (uint256 i = 0; i < cfg.freezers.length; ++i) {
             facility.addFreezer(cfg.freezers[i]);
         }
-
-        // --- Configure operator ---
-
         facility.kiss(cfg.operator);
-
-        // --- Chainlog ---
 
         dss.chainlog.setAddress(cfg.facilityKey, facility_);
     }

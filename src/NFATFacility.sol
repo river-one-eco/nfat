@@ -84,16 +84,15 @@ contract NFATFacility is ERC721 {
 
     // --- Constructor ---
 
-    constructor(address gem_, address recipient_, string memory name_, string memory symbol_)
+    constructor(address gem_, string memory name_, string memory symbol_)
         ERC721(name_, symbol_)
     {
         gem = GemLike(gem_);
-        recipient = recipient_;
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
     }
 
-    // --- Access Control Functions ---
+    // --- auth & cop Functions ---
 
     function rely(address usr) external auth {
         wards[usr] = 1;
@@ -136,8 +135,8 @@ contract NFATFacility is ERC721 {
     }
 
     function file(bytes32 what, address data) external auth {
-        if (what == "identityNetwork") identityNetwork = IdentityNetworkLike(data);
-        else if (what == "recipient") recipient = data;
+        if (what == "recipient") recipient = data;
+        else if (what == "identityNetwork") identityNetwork = IdentityNetworkLike(data);
         else revert("NFATFacility/file-unrecognized-param");
         emit File(what, data);
     }
@@ -146,6 +145,26 @@ contract NFATFacility is ERC721 {
         if (what == "baseURI") baseURI = data;
         else revert("NFATFacility/file-unrecognized-param");
         emit File(what, data);
+    }
+
+    // Note: In order to rescue gem balances tracked by the `deposits` or `collectable` mappings, prefer using rescueDeposit/rescueCollectable over this function
+    function rescue(address token, address to, uint256 amount) external auth {
+        GemLike(token).transfer(to, amount);
+        emit Rescue(token, to, amount);
+    }
+
+    function rescueDeposit(address depositor, address to, uint256 amount) external auth {
+        require(deposits[depositor] >= amount, "NFATFacility/insufficient-deposits");
+        unchecked { deposits[depositor] -= amount; }
+        gem.transfer(to, amount);
+        emit RescueDeposit(depositor, to, amount);
+    }
+
+    function rescueCollectable(uint256 tokenId, address to, uint256 amount) external auth {
+        require(collectable[tokenId] >= amount, "NFATFacility/insufficient-collectable");
+        unchecked { collectable[tokenId] -= amount; }
+        gem.transfer(to, amount);
+        emit RescueCollectable(tokenId, to, amount);
     }
 
     // --- Queue Functions ---
@@ -211,25 +230,4 @@ contract NFATFacility is ERC721 {
         return super._update(to, tokenId, auth_);
     }
 
-    // --- Rescue Functions ---
-
-    // Note: In order to rescue gem balances tracked by the `deposits` or `collectable` mappings, prefer using rescueDeposit/rescueCollectable over this function
-    function rescue(address token, address to, uint256 amount) external auth {
-        GemLike(token).transfer(to, amount);
-        emit Rescue(token, to, amount);
-    }
-
-    function rescueDeposit(address depositor, address to, uint256 amount) external auth {
-        require(deposits[depositor] >= amount, "NFATFacility/insufficient-deposits");
-        unchecked { deposits[depositor] -= amount; }
-        gem.transfer(to, amount);
-        emit RescueDeposit(depositor, to, amount);
-    }
-
-    function rescueCollectable(uint256 tokenId, address to, uint256 amount) external auth {
-        require(collectable[tokenId] >= amount, "NFATFacility/insufficient-collectable");
-        unchecked { collectable[tokenId] -= amount; }
-        gem.transfer(to, amount);
-        emit RescueCollectable(tokenId, to, amount);
-    }
 }

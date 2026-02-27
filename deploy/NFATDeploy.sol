@@ -25,13 +25,12 @@ library NFATDeploy {
     function deploy(
         address deployer,
         address owner,
-        address recipient,
         string memory name,
         string memory symbol
     ) internal returns (address facility) {
         ChainlogAbstract chainlog = ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
 
-        facility = address(new NFATFacility(chainlog.getAddress("SUSDS"), recipient, name, symbol));
+        facility = address(new NFATFacility(chainlog.getAddress("SUSDS"), name, symbol));
         ScriptTools.switchOwner(facility, deployer, owner);
     }
 }

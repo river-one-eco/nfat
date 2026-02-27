@@ -73,7 +73,7 @@ contract NFATFacilityTest is DssTest {
         receiver    = new ERC721ReceiverMock();
         badReceiver = new BadReceiverMock();
 
-        address facility_ = NFATDeploy.deploy(address(this), pauseProxy, almProxy, "Non-Fungible Allocation Token - Halo1", "NFAT-HALO1");
+        address facility_ = NFATDeploy.deploy(address(this), pauseProxy, "Non-Fungible Allocation Token - Halo1", "NFAT-HALO1");
         facility = NFATFacility(facility_);
         susds    = SUsdsLike(address(facility.gem()));
 
@@ -117,6 +117,7 @@ contract NFATFacilityTest is DssTest {
 
     function testDeployAndInit() public view {
         assertEq(facility.wards(pauseProxy), 1);
+        assertEq(facility.recipient(), almProxy);
         assertEq(facility.cops(freezer), 1);
         assertEq(facility.buds(operator), 1);
         assertEq(dss.chainlog.getAddress("NFAT_FAC_HALO1"), address(facility));
@@ -129,7 +130,7 @@ contract NFATFacilityTest is DssTest {
     }
 
     function testFile() public {
-        checkFileAddress(address(facility), "NFATFacility", ["identityNetwork", "recipient"]);
+        checkFileAddress(address(facility), "NFATFacility", ["recipient", "identityNetwork"]);
         checkFileString(address(facility), "NFATFacility", ["baseURI"]);
     }
 
