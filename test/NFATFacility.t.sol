@@ -53,7 +53,7 @@ contract NFATFacilityTest is DssTest {
     event Start();
     event Subscribe(address indexed depositor, uint256 amount, bytes data);
     event Withdraw(address indexed depositor, uint256 amount);
-    event Issue(address indexed target, uint256 indexed tokenId, uint256 amount);
+    event Issue(address indexed to, uint256 indexed tokenId, uint256 amount);
     event Fund(uint256 indexed tokenId, address indexed funder, uint256 amount);
     event Redeem(uint256 indexed tokenId, uint256 amount);
     event Rescue(address indexed token, address indexed to, uint256 amount);
@@ -129,7 +129,7 @@ contract NFATFacilityTest is DssTest {
     }
 
     function testFile() public {
-        checkFileAddress(address(facility), "NFATFacility", ["identityNetwork"]);
+        checkFileAddress(address(facility), "NFATFacility", ["identityNetwork", "recipient"]);
         checkFileString(address(facility), "NFATFacility", ["baseURI"]);
     }
 

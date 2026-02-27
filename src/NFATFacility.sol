@@ -34,12 +34,12 @@ contract NFATFacility is ERC721 {
     mapping(address usr       => uint256 allowed) public cops;     // Freezers
     mapping(address depositor => uint256 amount)  public deposits;
     mapping(uint256 tokenId   => uint256 amount)  public funded;
-    string              public baseURI;
-    bool                public stopped;
+    address             public recipient;  // Destination of funds claimed by the operator
     IdentityNetworkLike public identityNetwork;
+    bool                public stopped;
+    string              public baseURI;
 
     GemLike public immutable gem;        // Underlying asset
-    address public immutable recipient;  // Destination of funds claimed by the operator
 
     event Rely(address indexed usr);
     event Deny(address indexed usr);
@@ -53,7 +53,7 @@ contract NFATFacility is ERC721 {
     event File(bytes32 indexed what, string data);
     event Subscribe(address indexed depositor, uint256 amount, bytes data);
     event Withdraw(address indexed depositor, uint256 amount);
-    event Issue(address indexed target, uint256 indexed tokenId, uint256 amount);
+    event Issue(address indexed to, uint256 indexed tokenId, uint256 amount);
     event Fund(uint256 indexed tokenId, address indexed funder, uint256 amount);
     event Redeem(uint256 indexed tokenId, uint256 amount);
     event Rescue(address indexed token, address indexed to, uint256 amount);
@@ -137,6 +137,7 @@ contract NFATFacility is ERC721 {
 
     function file(bytes32 what, address data) external auth {
         if (what == "identityNetwork") identityNetwork = IdentityNetworkLike(data);
+        else if (what == "recipient") recipient = data;
         else revert("NFATFacility/file-unrecognized-param");
         emit File(what, data);
     }
@@ -165,13 +166,13 @@ contract NFATFacility is ERC721 {
     }
 
     // Note: amount = 0 is allowed (mint NFAT without moving funds)
-    function issue(address target, uint256 tokenId, uint256 amount) external toll notStopped {
+    function issue(address to, uint256 tokenId, uint256 amount) external toll notStopped {
         require(tokenId != 0, "NFATFacility/token-id-zero");
-        require(deposits[target] >= amount, "NFATFacility/insufficient-deposits");
-        unchecked { deposits[target] -= amount; }
-        _mint(target, tokenId); // identity network check in _update
+        require(deposits[to] >= amount, "NFATFacility/insufficient-deposits");
+        unchecked { deposits[to] -= amount; }
+        _mint(to, tokenId); // identity network check in _update
         if (amount > 0) gem.transfer(recipient, amount);
-        emit Issue(target, tokenId, amount);
+        emit Issue(to, tokenId, amount);
     }
 
     // --- Redeem Functions ---

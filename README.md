@@ -14,6 +14,3 @@ Below is a non-exhaustive list of deviations from [laniakea-docs](https://github
 - The spec tracks queue deposits through a shares-based accounting system. Since the deposited asset earns no yield while queued, shares would always be 1:1 with the underlying, so this implementation tracks deposits as direct balances instead.
 - The spec assumes capital is always claimed from the queue during issuance. This implementation allows `issue` with amount 0, enabling NFAT minting without claiming queued capital for greater flexibility.
 
-## Notes
-
-- The contract inherits OpenZeppelin's ERC721 which advertises support for the ERC721Metadata extension via `supportsInterface`. However, no base URI is configured, so `tokenURI()` returns an empty string for all tokens.
