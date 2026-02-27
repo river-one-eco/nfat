@@ -54,11 +54,11 @@ contract NFATFacilityTest is DssTest {
     event Subscribe(address indexed depositor, uint256 amount, bytes data);
     event Withdraw(address indexed depositor, uint256 amount);
     event Issue(address indexed to, uint256 indexed tokenId, uint256 amount);
-    event Fund(uint256 indexed tokenId, address indexed funder, uint256 amount);
-    event Redeem(uint256 indexed tokenId, uint256 amount);
+    event Repay(uint256 indexed tokenId, address indexed sender, uint256 amount);
+    event Collect(uint256 indexed tokenId, uint256 amount);
     event Rescue(address indexed token, address indexed to, uint256 amount);
     event RescueDeposit(address indexed depositor, address indexed to, uint256 amount);
-    event RescueFunded(uint256 indexed tokenId, address indexed to, uint256 amount);
+    event RescueCollectable(uint256 indexed tokenId, address indexed to, uint256 amount);
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
     event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
@@ -107,10 +107,10 @@ contract NFATFacilityTest is DssTest {
         vm.prank(operator); facility.issue(target, tokenId, amount);
     }
 
-    function _fundToken(uint256 tokenId, uint256 amount) internal {
+    function _repayToken(uint256 tokenId, uint256 amount) internal {
         deal(address(susds), address(this), susds.balanceOf(address(this)) + amount);
         susds.approve(address(facility), amount);
-        facility.fund(tokenId, amount);
+        facility.repay(tokenId, amount);
     }
 
     // --- Deploy & Init ---
@@ -335,29 +335,29 @@ contract NFATFacilityTest is DssTest {
         vm.prank(operator); facility.issue(prime1, 1, 50 ether);
     }
 
-    // --- Fund ---
+    // --- Repay ---
 
-    function testFund() public {
+    function testRepay() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
 
-        // First fund
+        // First repay
         deal(address(susds), address(this), 50 ether);
         susds.approve(address(facility), 50 ether);
 
         vm.expectEmit(true, true, true, true);
-        emit Fund(tokenId, address(this), 50 ether);
-        facility.fund(tokenId, 50 ether);
+        emit Repay(tokenId, address(this), 50 ether);
+        facility.repay(tokenId, 50 ether);
 
-        assertEq(facility.funded(tokenId), 50 ether);
+        assertEq(facility.collectable(tokenId), 50 ether);
 
-        // Second fund accumulates
-        _fundToken(tokenId, 20 ether);
+        // Second repay accumulates
+        _repayToken(tokenId, 20 ether);
 
-        assertEq(facility.funded(tokenId), 70 ether);
+        assertEq(facility.collectable(tokenId), 70 ether);
     }
 
-    function testRevertFundStopped() public {
+    function testRevertRepayStopped() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
         vm.prank(pauseProxy); facility.stop();
@@ -366,91 +366,91 @@ contract NFATFacilityTest is DssTest {
         susds.approve(address(facility), 50 ether);
 
         vm.expectRevert("NFATFacility/stopped");
-        facility.fund(tokenId, 50 ether);
+        facility.repay(tokenId, 50 ether);
     }
 
-    function testRevertFundZeroAmount() public {
+    function testRevertRepayZeroAmount() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
 
         vm.expectRevert("NFATFacility/zero-amount");
-        facility.fund(tokenId, 0);
+        facility.repay(tokenId, 0);
     }
 
-    function testRevertFundInvalidToken() public {
+    function testRevertRepayInvalidToken() public {
         vm.expectRevert("NFATFacility/invalid-token");
-        facility.fund(999, 1 ether);
+        facility.repay(999, 1 ether);
     }
 
-    // --- Redeem ---
+    // --- Collect ---
 
-    function testRedeem() public {
+    function testCollect() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
-        _fundToken(tokenId, 80 ether);
+        _repayToken(tokenId, 80 ether);
 
         uint256 balBefore = susds.balanceOf(prime1);
 
-        // Partial redeem
+        // Partial collect
         vm.expectEmit(true, true, true, true);
-        emit Redeem(tokenId, 30 ether);
-        vm.prank(prime1); facility.redeem(tokenId, 30 ether);
+        emit Collect(tokenId, 30 ether);
+        vm.prank(prime1); facility.collect(tokenId, 30 ether);
 
-        assertEq(facility.funded(tokenId), 50 ether);
+        assertEq(facility.collectable(tokenId), 50 ether);
         assertEq(susds.balanceOf(prime1), balBefore + 30 ether);
 
-        // Redeem remainder
-        vm.prank(prime1); facility.redeem(tokenId, 50 ether);
+        // Collect remainder
+        vm.prank(prime1); facility.collect(tokenId, 50 ether);
 
-        assertEq(facility.funded(tokenId), 0);
+        assertEq(facility.collectable(tokenId), 0);
         assertEq(susds.balanceOf(prime1), balBefore + 80 ether);
     }
 
-    function testRevertRedeemStopped() public {
+    function testRevertCollectStopped() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
-        _fundToken(tokenId, 50 ether);
+        _repayToken(tokenId, 50 ether);
         vm.prank(pauseProxy); facility.stop();
 
         vm.expectRevert("NFATFacility/stopped");
-        vm.prank(prime1); facility.redeem(tokenId, 50 ether);
+        vm.prank(prime1); facility.collect(tokenId, 50 ether);
     }
 
-    function testRevertRedeemZeroAmount() public {
+    function testRevertCollectZeroAmount() public {
         vm.expectRevert("NFATFacility/zero-amount");
-        vm.prank(prime1); facility.redeem(0, 0);
+        vm.prank(prime1); facility.collect(0, 0);
     }
 
-    function testRevertRedeemInsufficientFunded() public {
+    function testRevertCollectInsufficientCollectable() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
-        _fundToken(tokenId, 10 ether);
+        _repayToken(tokenId, 10 ether);
 
-        vm.expectRevert("NFATFacility/insufficient-funded");
-        vm.prank(prime1); facility.redeem(tokenId, 11 ether);
+        vm.expectRevert("NFATFacility/insufficient-collectable");
+        vm.prank(prime1); facility.collect(tokenId, 11 ether);
     }
 
-    function testRevertRedeemNotOwner() public {
+    function testRevertCollectNotOwner() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
-        _fundToken(tokenId, 50 ether);
+        _repayToken(tokenId, 50 ether);
 
         vm.expectRevert("NFATFacility/not-owner");
-        vm.prank(prime2); facility.redeem(tokenId, 50 ether);
+        vm.prank(prime2); facility.collect(tokenId, 50 ether);
     }
 
-    function testRevertRedeemNotMember() public {
+    function testRevertCollectNotMember() public {
         vm.prank(pauseProxy); facility.file("identityNetwork", address(idNet));
         idNet.setMember(prime1, true);
 
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
-        _fundToken(tokenId, 50 ether);
+        _repayToken(tokenId, 50 ether);
 
         idNet.setMember(prime1, false);
 
         vm.expectRevert("NFATFacility/not-member");
-        vm.prank(prime1); facility.redeem(tokenId, 50 ether);
+        vm.prank(prime1); facility.collect(tokenId, 50 ether);
     }
 
     // --- Rescue ---
@@ -501,29 +501,29 @@ contract NFATFacilityTest is DssTest {
         vm.prank(pauseProxy); facility.rescueDeposit(prime1, address(0xBEEF), 101 ether);
     }
 
-    function testRescueFunded() public {
+    function testRescueCollectable() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
-        _fundToken(tokenId, 80 ether);
+        _repayToken(tokenId, 80 ether);
 
         address rescueTo = address(0xBEEF);
 
         vm.expectEmit(true, true, true, true);
-        emit RescueFunded(tokenId, rescueTo, 50 ether);
-        vm.prank(pauseProxy); facility.rescueFunded(tokenId, rescueTo, 50 ether);
+        emit RescueCollectable(tokenId, rescueTo, 50 ether);
+        vm.prank(pauseProxy); facility.rescueCollectable(tokenId, rescueTo, 50 ether);
 
-        assertEq(facility.funded(tokenId), 30 ether);
+        assertEq(facility.collectable(tokenId), 30 ether);
         assertEq(susds.balanceOf(rescueTo), 50 ether);
         assertEq(susds.balanceOf(address(facility)), 30 ether);
     }
 
-    function testRescueFundedInsufficientFunded() public {
+    function testRescueCollectableInsufficientCollectable() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
-        _fundToken(tokenId, 10 ether);
+        _repayToken(tokenId, 10 ether);
 
-        vm.expectRevert("NFATFacility/insufficient-funded");
-        vm.prank(pauseProxy); facility.rescueFunded(tokenId, address(0xBEEF), 11 ether);
+        vm.expectRevert("NFATFacility/insufficient-collectable");
+        vm.prank(pauseProxy); facility.rescueCollectable(tokenId, address(0xBEEF), 11 ether);
     }
 
     // --- ERC-721 ---

@@ -33,7 +33,7 @@ contract NFATFacility is ERC721 {
     mapping(address usr       => uint256 allowed) public buds;     // Operator(s)
     mapping(address usr       => uint256 allowed) public cops;     // Freezers
     mapping(address depositor => uint256 amount)  public deposits;
-    mapping(uint256 tokenId   => uint256 amount)  public funded;
+    mapping(uint256 tokenId   => uint256 amount)  public collectable;
     address             public recipient;  // Destination of funds claimed by the operator
     IdentityNetworkLike public identityNetwork;
     bool                public stopped;
@@ -54,11 +54,11 @@ contract NFATFacility is ERC721 {
     event Subscribe(address indexed depositor, uint256 amount, bytes data);
     event Withdraw(address indexed depositor, uint256 amount);
     event Issue(address indexed to, uint256 indexed tokenId, uint256 amount);
-    event Fund(uint256 indexed tokenId, address indexed funder, uint256 amount);
-    event Redeem(uint256 indexed tokenId, uint256 amount);
+    event Repay(uint256 indexed tokenId, address indexed sender, uint256 amount);
+    event Collect(uint256 indexed tokenId, uint256 amount);
     event Rescue(address indexed token, address indexed to, uint256 amount);
     event RescueDeposit(address indexed depositor, address indexed to, uint256 amount);
-    event RescueFunded(uint256 indexed tokenId, address indexed to, uint256 amount);
+    event RescueCollectable(uint256 indexed tokenId, address indexed to, uint256 amount);
 
     // --- Modifiers ---
 
@@ -175,25 +175,25 @@ contract NFATFacility is ERC721 {
         emit Issue(to, tokenId, amount);
     }
 
-    // --- Redeem Functions ---
+    // --- Redemption Functions ---
 
-    // Note: the recipient of a transferred NFAT is assumed aware of current and future planned funding, including potential front-running
-    function fund(uint256 tokenId, uint256 amount) external notStopped {
+    // Note: the recipient of a transferred NFAT is assumed aware of current and future planned repayments, including potential front-running
+    function repay(uint256 tokenId, uint256 amount) external notStopped {
         require(amount > 0, "NFATFacility/zero-amount");
         require(_ownerOf(tokenId) != address(0), "NFATFacility/invalid-token");
-        funded[tokenId] += amount;
+        collectable[tokenId] += amount;
         gem.transferFrom(msg.sender, address(this), amount);
-        emit Fund(tokenId, msg.sender, amount);
+        emit Repay(tokenId, msg.sender, amount);
     }
 
-    function redeem(uint256 tokenId, uint256 amount) external notStopped {
+    function collect(uint256 tokenId, uint256 amount) external notStopped {
         require(amount > 0, "NFATFacility/zero-amount");
-        require(funded[tokenId] >= amount, "NFATFacility/insufficient-funded");
+        require(collectable[tokenId] >= amount, "NFATFacility/insufficient-collectable");
         require(msg.sender == _ownerOf(tokenId), "NFATFacility/not-owner");
         require(address(identityNetwork) == address(0) || identityNetwork.isMember(msg.sender), "NFATFacility/not-member");
-        unchecked { funded[tokenId] -= amount; }
+        unchecked { collectable[tokenId] -= amount; }
         gem.transfer(msg.sender, amount);
-        emit Redeem(tokenId, amount);
+        emit Collect(tokenId, amount);
     }
 
     // --- ERC-721 Overrides ---
@@ -213,7 +213,7 @@ contract NFATFacility is ERC721 {
 
     // --- Rescue Functions ---
 
-    // Note: In order to rescue gem balances tracked by the `deposits` or `funded` mappings, prefer using rescueDeposit/rescueFunded over this function
+    // Note: In order to rescue gem balances tracked by the `deposits` or `collectable` mappings, prefer using rescueDeposit/rescueCollectable over this function
     function rescue(address token, address to, uint256 amount) external auth {
         GemLike(token).transfer(to, amount);
         emit Rescue(token, to, amount);
@@ -226,10 +226,10 @@ contract NFATFacility is ERC721 {
         emit RescueDeposit(depositor, to, amount);
     }
 
-    function rescueFunded(uint256 tokenId, address to, uint256 amount) external auth {
-        require(funded[tokenId] >= amount, "NFATFacility/insufficient-funded");
-        unchecked { funded[tokenId] -= amount; }
+    function rescueCollectable(uint256 tokenId, address to, uint256 amount) external auth {
+        require(collectable[tokenId] >= amount, "NFATFacility/insufficient-collectable");
+        unchecked { collectable[tokenId] -= amount; }
         gem.transfer(to, amount);
-        emit RescueFunded(tokenId, to, amount);
+        emit RescueCollectable(tokenId, to, amount);
     }
 }
