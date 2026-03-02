@@ -187,6 +187,7 @@ contract NFATFacility is ERC721 {
     }
 
     // Note: amount = 0 is allowed (mint NFAT without moving funds)
+    // Note: _mint is used instead of _safeMint — `to` opted in via subscribe and is assumed to support ERC-721
     function issue(address to, uint256 tokenId, uint256 amount) external toll notStopped {
         require(tokenId != 0, "NFATFacility/token-id-zero");
         require(deposits[to] >= amount, "NFATFacility/insufficient-deposits");
