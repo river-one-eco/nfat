@@ -208,6 +208,7 @@ contract NFATFacility is ERC721 {
         emit Repay(msg.sender, tokenId, amount);
     }
 
+    // Note: only the NFAT owner can collect (token and operator approvals do not extend to this function); the owner is assumed to be able to call this function directly
     function collect(uint256 tokenId, uint256 amount) external notStopped {
         require(amount > 0, "NFATFacility/zero-amount");
         require(collectable[tokenId] >= amount, "NFATFacility/insufficient-collectable");
