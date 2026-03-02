@@ -148,6 +148,7 @@ contract NFATFacility is ERC721 {
     }
 
     // Note: In order to rescue gem balances tracked by the `deposits` or `collectable` mappings, prefer using rescueDeposit/rescueCollectable over this function
+    // Note: tokens that return false instead of reverting on failure may cause a Rescue event to be emitted without an actual transfer
     function rescue(address token, address to, uint256 amount) external auth {
         GemLike(token).transfer(to, amount);
         emit Rescue(token, to, amount);
