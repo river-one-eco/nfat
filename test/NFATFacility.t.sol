@@ -51,14 +51,14 @@ contract NFATFacilityTest is DssTest {
     event RemoveFreezer(address indexed usr);
     event Stop();
     event Start();
-    event Subscribe(address indexed depositor, uint256 amount, bytes data);
-    event Withdraw(address indexed depositor, uint256 amount);
-    event Issue(address indexed to, uint256 indexed tokenId, uint256 amount);
-    event Repay(uint256 indexed tokenId, address indexed sender, uint256 amount);
-    event Collect(uint256 indexed tokenId, uint256 amount);
     event Rescue(address indexed token, address indexed to, uint256 amount);
     event RescueDeposit(address indexed depositor, address indexed to, uint256 amount);
     event RescueCollectable(uint256 indexed tokenId, address indexed to, uint256 amount);
+    event Subscribe(address indexed depositor, uint256 amount, bytes data);
+    event Withdraw(address indexed depositor, uint256 amount);
+    event Issue(address indexed to, uint256 indexed tokenId, uint256 amount);
+    event Repay(address indexed sender, uint256 indexed tokenId, uint256 amount);
+    event Collect(uint256 indexed tokenId, uint256 amount);
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
     event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
@@ -80,11 +80,13 @@ contract NFATFacilityTest is DssTest {
         address[] memory _freezers = new address[](1);
         _freezers[0] = freezer;
         NFATConfig memory cfg = NFATConfig({
-            facilityKey:     "NFAT_FAC_HALO1",
+            name:            "Non-Fungible Allocation Token - Halo1",
+            symbol:          "NFAT-HALO1",
             almProxy:        almProxy,
             identityNetwork: address(0),
             operator:        operator,
-            freezers:        _freezers
+            freezers:        _freezers,
+            facilityKey:     "NFAT_FAC_HALO1"
         });
         vm.startPrank(pauseProxy);
         NFATInit.init(dss, facility_, cfg);
@@ -227,7 +229,7 @@ contract NFATFacilityTest is DssTest {
     }
 
     function testRevertSubscribeStopped() public {
-        vm.prank(pauseProxy); facility.stop();
+        vm.prank(freezer); facility.stop();
 
         vm.expectRevert("NFATFacility/stopped");
         vm.prank(prime1); facility.subscribe(100 ether, "");
@@ -307,7 +309,7 @@ contract NFATFacilityTest is DssTest {
 
     function testRevertIssueStopped() public {
         _subscribe(prime1, 100 ether);
-        vm.prank(pauseProxy); facility.stop();
+        vm.prank(freezer); facility.stop();
 
         vm.expectRevert("NFATFacility/stopped");
         vm.prank(operator); facility.issue(prime1, 1, 50 ether);
@@ -347,7 +349,7 @@ contract NFATFacilityTest is DssTest {
         susds.approve(address(facility), 50 ether);
 
         vm.expectEmit(true, true, true, true);
-        emit Repay(tokenId, address(this), 50 ether);
+        emit Repay(address(this), tokenId, 50 ether);
         facility.repay(tokenId, 50 ether);
 
         assertEq(facility.collectable(tokenId), 50 ether);
@@ -361,7 +363,7 @@ contract NFATFacilityTest is DssTest {
     function testRevertRepayStopped() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
-        vm.prank(pauseProxy); facility.stop();
+        vm.prank(freezer); facility.stop();
 
         deal(address(susds), address(this), 50 ether);
         susds.approve(address(facility), 50 ether);
@@ -411,7 +413,7 @@ contract NFATFacilityTest is DssTest {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
         _repayToken(tokenId, 50 ether);
-        vm.prank(pauseProxy); facility.stop();
+        vm.prank(freezer); facility.stop();
 
         vm.expectRevert("NFATFacility/stopped");
         vm.prank(prime1); facility.collect(tokenId, 50 ether);

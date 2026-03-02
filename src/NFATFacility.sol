@@ -51,14 +51,14 @@ contract NFATFacility is ERC721 {
     event Start();
     event File(bytes32 indexed what, address data);
     event File(bytes32 indexed what, string data);
-    event Subscribe(address indexed depositor, uint256 amount, bytes data);
-    event Withdraw(address indexed depositor, uint256 amount);
-    event Issue(address indexed to, uint256 indexed tokenId, uint256 amount);
-    event Repay(uint256 indexed tokenId, address indexed sender, uint256 amount);
-    event Collect(uint256 indexed tokenId, uint256 amount);
     event Rescue(address indexed token, address indexed to, uint256 amount);
     event RescueDeposit(address indexed depositor, address indexed to, uint256 amount);
     event RescueCollectable(uint256 indexed tokenId, address indexed to, uint256 amount);
+    event Subscribe(address indexed depositor, uint256 amount, bytes data);
+    event Withdraw(address indexed depositor, uint256 amount);
+    event Issue(address indexed to, uint256 indexed tokenId, uint256 amount);
+    event Repay(address indexed sender, uint256 indexed tokenId, uint256 amount);
+    event Collect(uint256 indexed tokenId, uint256 amount);
 
     // --- Modifiers ---
 
@@ -68,12 +68,12 @@ contract NFATFacility is ERC721 {
     }
 
     modifier toll() {
-        require(buds[msg.sender] == 1 || wards[msg.sender] == 1, "NFATFacility/not-operator");
+        require(buds[msg.sender] == 1, "NFATFacility/not-operator");
         _;
     }
 
     modifier cop() {
-        require(cops[msg.sender] == 1 || wards[msg.sender] == 1, "NFATFacility/not-freezer");
+        require(cops[msg.sender] == 1, "NFATFacility/not-freezer");
         _;
     }
 
@@ -171,8 +171,10 @@ contract NFATFacility is ERC721 {
 
     // Note: amount = 0 is allowed to emit updated data without depositing; data is arbitrary and intended for off-chain agreements
     function subscribe(uint256 amount, bytes calldata data) external notStopped {
-        deposits[msg.sender] += amount;
-        if (amount > 0) gem.transferFrom(msg.sender, address(this), amount);
+        if (amount > 0) {
+            gem.transferFrom(msg.sender, address(this), amount);
+            deposits[msg.sender] += amount;
+        }
         emit Subscribe(msg.sender, amount, data);
     }
 
@@ -200,9 +202,9 @@ contract NFATFacility is ERC721 {
     function repay(uint256 tokenId, uint256 amount) external notStopped {
         require(amount > 0, "NFATFacility/zero-amount");
         require(_ownerOf(tokenId) != address(0), "NFATFacility/invalid-token");
-        collectable[tokenId] += amount;
         gem.transferFrom(msg.sender, address(this), amount);
-        emit Repay(tokenId, msg.sender, amount);
+        collectable[tokenId] += amount;
+        emit Repay(msg.sender, tokenId, amount);
     }
 
     function collect(uint256 tokenId, uint256 amount) external notStopped {
