@@ -271,7 +271,10 @@ contract NFATFacilityTest is DssTest {
         _subscribe(prime1, 100 ether);
 
         // First issue
-        uint256 tokenId0 = _issue(prime1, 60 ether);
+        uint256 tokenId0 = vm.randomUint();
+        vm.expectEmit(true, true, true, true);
+        emit Issue(prime1, tokenId0, 60 ether);
+        vm.prank(operator); facility.issue(prime1, tokenId0, 60 ether);
 
         assertEq(facility.ownerOf(tokenId0), prime1);
         assertEq(facility.balanceOf(prime1), 1);
@@ -409,6 +412,22 @@ contract NFATFacilityTest is DssTest {
         assertEq(susds.balanceOf(prime1), balBefore + 80 ether);
     }
 
+    function testCollectAfterTransfer() public {
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+        _repayToken(tokenId, 50 ether);
+
+        vm.prank(prime1); facility.transferFrom(prime1, prime2, tokenId);
+
+        assertEq(facility.collectable(tokenId), 50 ether);
+
+        uint256 balBefore = susds.balanceOf(prime2);
+        vm.prank(prime2); facility.collect(tokenId, 50 ether);
+
+        assertEq(facility.collectable(tokenId), 0);
+        assertEq(susds.balanceOf(prime2), balBefore + 50 ether);
+    }
+
     function testRevertCollectStopped() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
@@ -497,7 +516,7 @@ contract NFATFacilityTest is DssTest {
         assertEq(susds.balanceOf(address(facility)), 40 ether);
     }
 
-    function testRescueDepositInsufficientDeposits() public {
+    function testRevertRescueDepositInsufficientDeposits() public {
         _subscribe(prime1, 100 ether);
 
         vm.expectRevert("NFATFacility/insufficient-deposits");
@@ -520,7 +539,7 @@ contract NFATFacilityTest is DssTest {
         assertEq(susds.balanceOf(address(facility)), 30 ether);
     }
 
-    function testRescueCollectableInsufficientCollectable() public {
+    function testRevertRescueCollectableInsufficientCollectable() public {
         _subscribe(prime1, 100 ether);
         uint256 tokenId = _issue(prime1, 100 ether);
         _repayToken(tokenId, 10 ether);
