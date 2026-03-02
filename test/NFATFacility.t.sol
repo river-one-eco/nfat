@@ -7,7 +7,7 @@ import { NFATDeploy } from "deploy/NFATDeploy.sol";
 import { NFATInit, NFATConfig } from "deploy/NFATInit.sol";
 import { IERC721Errors } from "openzeppelin-contracts/contracts/interfaces/draft-IERC6093.sol";
 
-interface SUsdsLike {
+interface GemLike {
     function balanceOf(address) external view returns (uint256);
     function approve(address, uint256) external;
 }
@@ -33,7 +33,7 @@ contract BadReceiverMock {
 contract NFATFacilityTest is DssTest {
     DssInstance           dss;
     NFATFacility          facility;
-    SUsdsLike             susds;
+    GemLike               susds;
     IdentityNetworkMock   idNet;
     ERC721ReceiverMock    receiver;
     BadReceiverMock       badReceiver;
@@ -68,6 +68,7 @@ contract NFATFacilityTest is DssTest {
 
         dss        = MCD.loadFromChainlog(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
         pauseProxy = dss.chainlog.getAddress("MCD_PAUSE_PROXY");
+        susds      = GemLike(dss.chainlog.getAddress("SUSDS"));
 
         idNet       = new IdentityNetworkMock();
         receiver    = new ERC721ReceiverMock();
@@ -75,7 +76,6 @@ contract NFATFacilityTest is DssTest {
 
         address facility_ = NFATDeploy.deploy(address(this), pauseProxy, "Non-Fungible Allocation Token - Halo1", "NFAT-HALO1");
         facility = NFATFacility(facility_);
-        susds    = SUsdsLike(address(facility.gem()));
 
         address[] memory _freezers = new address[](1);
         _freezers[0] = freezer;
@@ -115,13 +115,31 @@ contract NFATFacilityTest is DssTest {
         facility.repay(tokenId, amount);
     }
 
+    // --- Constructor ---
+
+    function testConstructor() public {
+        vm.expectEmit(true, true, true, true);
+        emit Rely(address(this));
+        NFATFacility f = new NFATFacility(address(0x111), "Name", "SYM");
+
+        assertEq(address(f.gem()), address(0x111));
+        assertEq(f.name(), "Name");
+        assertEq(f.symbol(), "SYM");
+        assertEq(f.wards(address(this)), 1);
+    }
+
     // --- Deploy & Init ---
 
     function testDeployAndInit() public view {
+        assertEq(address(facility.gem()), address(susds));
+        assertEq(facility.name(), "Non-Fungible Allocation Token - Halo1");
+        assertEq(facility.symbol(), "NFAT-HALO1");
+        assertEq(facility.wards(address(this)), 0);
         assertEq(facility.wards(pauseProxy), 1);
         assertEq(facility.recipient(), almProxy);
-        assertEq(facility.cops(freezer), 1);
+        assertEq(address(facility.identityNetwork()), address(0));
         assertEq(facility.buds(operator), 1);
+        assertEq(facility.cops(freezer), 1);
         assertEq(dss.chainlog.getAddress("NFAT_FAC_HALO1"), address(facility));
     }
 
@@ -498,8 +516,8 @@ contract NFATFacilityTest is DssTest {
         emit Rescue(usds, rescueTo, 50 ether);
         vm.prank(pauseProxy); facility.rescue(usds, rescueTo, 50 ether);
 
-        assertEq(SUsdsLike(usds).balanceOf(rescueTo), 50 ether);
-        assertEq(SUsdsLike(usds).balanceOf(address(facility)), 0);
+        assertEq(GemLike(usds).balanceOf(rescueTo), 50 ether);
+        assertEq(GemLike(usds).balanceOf(address(facility)), 0);
     }
 
     function testRescueDeposit() public {
