@@ -37,6 +37,7 @@ struct NFATConfig {
     bytes32   facilityKey;
 }
 
+// Note: deployment scripts assume L1; adapt for L2
 library NFATInit {
 
     function init(
