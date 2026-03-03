@@ -149,11 +149,6 @@ contract NFATFacilityTest is DssTest {
         checkAuth(address(facility), "NFATFacility");
     }
 
-    function testFile() public {
-        checkFileAddress(address(facility), "NFATFacility", ["recipient", "identityNetwork"]);
-        checkFileString(address(facility), "NFATFacility", ["baseURI"]);
-    }
-
     function testModifiers() public {
         vm.startPrank(address(0xBEEF));
         checkModifier(address(facility), "NFATFacility/not-authorized", [
@@ -161,7 +156,10 @@ contract NFATFacilityTest is DssTest {
             facility.diss.selector,
             facility.addFreezer.selector,
             facility.removeFreezer.selector,
-            facility.start.selector
+            facility.start.selector,
+            facility.rescue.selector,
+            facility.rescueDeposit.selector,
+            facility.rescueCollectable.selector
         ]);
         vm.stopPrank();
 
@@ -205,8 +203,8 @@ contract NFATFacilityTest is DssTest {
 
     function testStopStart() public {
         _subscribe(prime1, 100 ether);
-
         vm.prank(operator); facility.issue(prime1, 1, 25 ether);
+        _repayToken(1, 50 ether);
 
         vm.expectEmit(true, true, true, true);
         emit Stop();
@@ -214,283 +212,28 @@ contract NFATFacilityTest is DssTest {
         assertTrue(facility.stopped());
 
         vm.expectRevert("NFATFacility/stopped");
+        vm.prank(prime1); facility.subscribe(25 ether, "");
+        vm.expectRevert("NFATFacility/stopped");
         vm.prank(operator); facility.issue(prime1, 2, 25 ether);
+        vm.expectRevert("NFATFacility/stopped");
+        facility.repay(1, 10 ether);
+        vm.expectRevert("NFATFacility/stopped");
+        vm.prank(prime1); facility.collect(1, 50 ether);
 
         vm.expectEmit(true, true, true, true);
         emit Start();
         vm.prank(pauseProxy); facility.start();
         assertTrue(!facility.stopped());
 
+        _subscribe(prime1, 25 ether);
         vm.prank(operator); facility.issue(prime1, 2, 25 ether);
+        _repayToken(2, 10 ether);
+        vm.prank(prime1); facility.collect(1, 50 ether);
     }
 
-    // --- Queue ---
-
-    function testSubscribe() public {
-        vm.expectEmit(true, true, true, true);
-        emit Subscribe(prime1, 100 ether, "");
-        _subscribe(prime1, 100 ether);
-
-        assertEq(facility.deposits(prime1), 100 ether);
-        assertEq(susds.balanceOf(address(facility)), 100 ether);
-    }
-
-    function testSubscribeZeroAmountWithData() public {
-        bytes memory data = bytes("sample terms");
-        uint256 depositsBefore = facility.deposits(prime1);
-
-        vm.expectEmit(true, true, true, true);
-        emit Subscribe(prime1, 0, data);
-        vm.prank(prime1); facility.subscribe(0, data);
-
-        assertEq(facility.deposits(prime1), depositsBefore);
-    }
-
-    function testRevertSubscribeStopped() public {
-        vm.prank(freezer); facility.stop();
-
-        vm.expectRevert("NFATFacility/stopped");
-        vm.prank(prime1); facility.subscribe(100 ether, "");
-    }
-
-    function testWithdraw() public {
-        _subscribe(prime1, 100 ether);
-
-        // Partial withdraw
-        vm.expectEmit(true, true, true, true);
-        emit Withdraw(prime1, 40 ether);
-        vm.prank(prime1); facility.withdraw(40 ether);
-
-        assertEq(facility.deposits(prime1), 60 ether);
-        assertEq(susds.balanceOf(prime1), 940 ether);
-
-        // Withdraw remainder
-        vm.prank(prime1); facility.withdraw(60 ether);
-
-        assertEq(facility.deposits(prime1), 0);
-        assertEq(susds.balanceOf(prime1), 1000 ether);
-    }
-
-    function testRevertWithdrawZeroAmount() public {
-        vm.expectRevert("NFATFacility/zero-amount");
-        vm.prank(prime1); facility.withdraw(0);
-    }
-
-    function testRevertWithdrawInsufficientDeposits() public {
-        _subscribe(prime1, 100 ether);
-
-        vm.expectRevert("NFATFacility/insufficient-deposits");
-        vm.prank(prime1); facility.withdraw(101 ether);
-    }
-
-    // --- Issue ---
-
-    function testIssue() public {
-        _subscribe(prime1, 100 ether);
-
-        // First issue
-        uint256 tokenId0 = vm.randomUint();
-        vm.expectEmit(true, true, true, true);
-        emit Issue(prime1, tokenId0, 60 ether);
-        vm.prank(operator); facility.issue(prime1, tokenId0, 60 ether);
-
-        assertEq(facility.ownerOf(tokenId0), prime1);
-        assertEq(facility.balanceOf(prime1), 1);
-        assertEq(facility.deposits(prime1), 40 ether);
-        assertEq(susds.balanceOf(almProxy), 60 ether);
-
-        // Second issue
-        uint256 tokenId1 = _issue(prime1, 30 ether);
-
-        assertEq(facility.ownerOf(tokenId1), prime1);
-        assertEq(facility.balanceOf(prime1), 2);
-        assertEq(facility.deposits(prime1), 10 ether);
-    }
-
-    function testIssueZeroAmount() public {
-        uint256 depositsBefore = facility.deposits(prime1);
-        uint256 almBalBefore   = susds.balanceOf(almProxy);
-
-        vm.prank(operator); facility.issue(prime1, 1, 0 ether);
-
-        assertEq(facility.ownerOf(1), prime1);
-        assertEq(facility.deposits(prime1), depositsBefore);
-        assertEq(susds.balanceOf(almProxy), almBalBefore);
-    }
-
-    function testIssueWithIdentityNetwork() public {
-        vm.prank(pauseProxy); facility.file("identityNetwork", address(idNet));
-        idNet.setMember(prime1, true);
-
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 50 ether);
-
-        assertEq(facility.ownerOf(tokenId), prime1);
-    }
-
-    function testRevertIssueStopped() public {
-        _subscribe(prime1, 100 ether);
-        vm.prank(freezer); facility.stop();
-
-        vm.expectRevert("NFATFacility/stopped");
-        vm.prank(operator); facility.issue(prime1, 1, 50 ether);
-    }
-
-    function testRevertIssueTokenIdZero() public {
-        _subscribe(prime1, 100 ether);
-
-        vm.expectRevert("NFATFacility/token-id-zero");
-        vm.prank(operator); facility.issue(prime1, 0, 50 ether);
-    }
-
-    function testRevertIssueInsufficientDeposits() public {
-        _subscribe(prime1, 100 ether);
-
-        vm.expectRevert("NFATFacility/insufficient-deposits");
-        vm.prank(operator); facility.issue(prime1, 1, 101 ether);
-    }
-
-    function testRevertIssueTargetNotMember() public {
-        vm.prank(pauseProxy); facility.file("identityNetwork", address(idNet));
-
-        _subscribe(prime1, 100 ether);
-
-        vm.expectRevert("NFATFacility/not-member");
-        vm.prank(operator); facility.issue(prime1, 1, 50 ether);
-    }
-
-    // --- Repay ---
-
-    function testRepay() public {
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 100 ether);
-
-        // First repay
-        deal(address(susds), address(this), 50 ether);
-        susds.approve(address(facility), 50 ether);
-
-        vm.expectEmit(true, true, true, true);
-        emit Repay(address(this), tokenId, 50 ether);
-        facility.repay(tokenId, 50 ether);
-
-        assertEq(facility.collectable(tokenId), 50 ether);
-
-        // Second repay accumulates
-        _repayToken(tokenId, 20 ether);
-
-        assertEq(facility.collectable(tokenId), 70 ether);
-    }
-
-    function testRevertRepayStopped() public {
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 100 ether);
-        vm.prank(freezer); facility.stop();
-
-        deal(address(susds), address(this), 50 ether);
-        susds.approve(address(facility), 50 ether);
-
-        vm.expectRevert("NFATFacility/stopped");
-        facility.repay(tokenId, 50 ether);
-    }
-
-    function testRevertRepayZeroAmount() public {
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 100 ether);
-
-        vm.expectRevert("NFATFacility/zero-amount");
-        facility.repay(tokenId, 0);
-    }
-
-    function testRevertRepayInvalidToken() public {
-        vm.expectRevert("NFATFacility/invalid-token");
-        facility.repay(999, 1 ether);
-    }
-
-    // --- Collect ---
-
-    function testCollect() public {
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 100 ether);
-        _repayToken(tokenId, 80 ether);
-
-        uint256 balBefore = susds.balanceOf(prime1);
-
-        // Partial collect
-        vm.expectEmit(true, true, true, true);
-        emit Collect(tokenId, 30 ether);
-        vm.prank(prime1); facility.collect(tokenId, 30 ether);
-
-        assertEq(facility.collectable(tokenId), 50 ether);
-        assertEq(susds.balanceOf(prime1), balBefore + 30 ether);
-
-        // Collect remainder
-        vm.prank(prime1); facility.collect(tokenId, 50 ether);
-
-        assertEq(facility.collectable(tokenId), 0);
-        assertEq(susds.balanceOf(prime1), balBefore + 80 ether);
-    }
-
-    function testCollectAfterTransfer() public {
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 100 ether);
-        _repayToken(tokenId, 50 ether);
-
-        vm.prank(prime1); facility.transferFrom(prime1, prime2, tokenId);
-
-        assertEq(facility.collectable(tokenId), 50 ether);
-
-        uint256 balBefore = susds.balanceOf(prime2);
-        vm.prank(prime2); facility.collect(tokenId, 50 ether);
-
-        assertEq(facility.collectable(tokenId), 0);
-        assertEq(susds.balanceOf(prime2), balBefore + 50 ether);
-    }
-
-    function testRevertCollectStopped() public {
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 100 ether);
-        _repayToken(tokenId, 50 ether);
-        vm.prank(freezer); facility.stop();
-
-        vm.expectRevert("NFATFacility/stopped");
-        vm.prank(prime1); facility.collect(tokenId, 50 ether);
-    }
-
-    function testRevertCollectZeroAmount() public {
-        vm.expectRevert("NFATFacility/zero-amount");
-        vm.prank(prime1); facility.collect(0, 0);
-    }
-
-    function testRevertCollectInsufficientCollectable() public {
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 100 ether);
-        _repayToken(tokenId, 10 ether);
-
-        vm.expectRevert("NFATFacility/insufficient-collectable");
-        vm.prank(prime1); facility.collect(tokenId, 11 ether);
-    }
-
-    function testRevertCollectNotOwner() public {
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 100 ether);
-        _repayToken(tokenId, 50 ether);
-
-        vm.expectRevert("NFATFacility/not-owner");
-        vm.prank(prime2); facility.collect(tokenId, 50 ether);
-    }
-
-    function testRevertCollectNotMember() public {
-        vm.prank(pauseProxy); facility.file("identityNetwork", address(idNet));
-        idNet.setMember(prime1, true);
-
-        _subscribe(prime1, 100 ether);
-        uint256 tokenId = _issue(prime1, 100 ether);
-        _repayToken(tokenId, 50 ether);
-
-        idNet.setMember(prime1, false);
-
-        vm.expectRevert("NFATFacility/not-member");
-        vm.prank(prime1); facility.collect(tokenId, 50 ether);
+    function testFile() public {
+        checkFileAddress(address(facility), "NFATFacility", ["recipient", "identityNetwork"]);
+        checkFileString(address(facility), "NFATFacility", ["baseURI"]);
     }
 
     // --- Rescue ---
@@ -564,6 +307,277 @@ contract NFATFacilityTest is DssTest {
 
         vm.expectRevert("NFATFacility/insufficient-collectable");
         vm.prank(pauseProxy); facility.rescueCollectable(tokenId, address(0xBEEF), 11 ether);
+    }
+
+    // --- Queue ---
+
+    function testSubscribe() public {
+        vm.expectEmit(true, true, true, true);
+        emit Subscribe(prime1, 100 ether, "");
+        _subscribe(prime1, 100 ether);
+
+        assertEq(facility.deposits(prime1), 100 ether);
+        assertEq(susds.balanceOf(address(facility)), 100 ether);
+
+        // Second subscribe adds up
+        _subscribe(prime1, 50 ether);
+
+        assertEq(facility.deposits(prime1), 150 ether);
+        assertEq(susds.balanceOf(address(facility)), 150 ether);
+    }
+
+    function testSubscribeZeroAmountWithData() public {
+        bytes memory data = bytes("sample terms");
+        uint256 depositsBefore = facility.deposits(prime1);
+
+        vm.expectEmit(true, true, true, true);
+        emit Subscribe(prime1, 0, data);
+        vm.prank(prime1); facility.subscribe(0, data);
+
+        assertEq(facility.deposits(prime1), depositsBefore);
+    }
+
+    function testWithdraw() public {
+        _subscribe(prime1, 100 ether);
+
+        // Partial withdraw
+        vm.expectEmit(true, true, true, true);
+        emit Withdraw(prime1, 40 ether);
+        vm.prank(prime1); facility.withdraw(40 ether);
+
+        assertEq(facility.deposits(prime1), 60 ether);
+        assertEq(susds.balanceOf(prime1), 940 ether);
+
+        // Withdraw remainder
+        vm.prank(prime1); facility.withdraw(60 ether);
+
+        assertEq(facility.deposits(prime1), 0);
+        assertEq(susds.balanceOf(prime1), 1000 ether);
+    }
+
+    function testWithdrawWhenStopped() public {
+        _subscribe(prime1, 100 ether);
+        vm.prank(freezer); facility.stop();
+
+        vm.prank(prime1); facility.withdraw(100 ether);
+
+        assertEq(facility.deposits(prime1), 0);
+        assertEq(susds.balanceOf(prime1), 1000 ether);
+    }
+
+    function testRevertWithdrawZeroAmount() public {
+        vm.expectRevert("NFATFacility/zero-amount");
+        vm.prank(prime1); facility.withdraw(0);
+    }
+
+    function testRevertWithdrawInsufficientDeposits() public {
+        _subscribe(prime1, 100 ether);
+
+        vm.expectRevert("NFATFacility/insufficient-deposits");
+        vm.prank(prime1); facility.withdraw(101 ether);
+    }
+
+    // --- Issue ---
+
+    function testIssue() public {
+        _subscribe(prime1, 100 ether);
+
+        // First issue
+        uint256 tokenId0 = vm.randomUint();
+        vm.expectEmit(true, true, true, true);
+        emit Issue(prime1, tokenId0, 60 ether);
+        vm.prank(operator); facility.issue(prime1, tokenId0, 60 ether);
+
+        assertEq(facility.ownerOf(tokenId0), prime1);
+        assertEq(facility.balanceOf(prime1), 1);
+        assertEq(facility.deposits(prime1), 40 ether);
+        assertEq(susds.balanceOf(almProxy), 60 ether);
+
+        // Second issue
+        uint256 tokenId1 = _issue(prime1, 30 ether);
+
+        assertEq(facility.ownerOf(tokenId1), prime1);
+        assertEq(facility.balanceOf(prime1), 2);
+        assertEq(facility.deposits(prime1), 10 ether);
+    }
+
+    function testIssueZeroAmount() public {
+        uint256 depositsBefore = facility.deposits(prime1);
+        uint256 almBalBefore   = susds.balanceOf(almProxy);
+
+        vm.prank(operator); facility.issue(prime1, 1, 0 ether);
+
+        assertEq(facility.ownerOf(1), prime1);
+        assertEq(facility.deposits(prime1), depositsBefore);
+        assertEq(susds.balanceOf(almProxy), almBalBefore);
+    }
+
+    function testIssueWithIdentityNetwork() public {
+        vm.prank(pauseProxy); facility.file("identityNetwork", address(idNet));
+        idNet.setMember(prime1, true);
+
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 50 ether);
+
+        assertEq(facility.ownerOf(tokenId), prime1);
+    }
+
+    function testRevertIssueTokenIdZero() public {
+        _subscribe(prime1, 100 ether);
+
+        vm.expectRevert("NFATFacility/token-id-zero");
+        vm.prank(operator); facility.issue(prime1, 0, 50 ether);
+    }
+
+    function testRevertIssueInsufficientDeposits() public {
+        _subscribe(prime1, 100 ether);
+
+        vm.expectRevert("NFATFacility/insufficient-deposits");
+        vm.prank(operator); facility.issue(prime1, 1, 101 ether);
+    }
+
+    function testRevertIssueDuplicateTokenId() public {
+        _subscribe(prime1, 200 ether);
+        vm.prank(operator); facility.issue(prime1, 1, 50 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721InvalidSender.selector, address(0)));
+        vm.prank(operator); facility.issue(prime1, 1, 50 ether);
+    }
+
+    function testRevertIssueTargetNotMember() public {
+        vm.prank(pauseProxy); facility.file("identityNetwork", address(idNet));
+
+        _subscribe(prime1, 100 ether);
+
+        vm.expectRevert("NFATFacility/not-member");
+        vm.prank(operator); facility.issue(prime1, 1, 50 ether);
+    }
+
+    // --- Repay ---
+
+    function testRepay() public {
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+
+        // First repay
+        deal(address(susds), address(this), 50 ether);
+        susds.approve(address(facility), 50 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit Repay(address(this), tokenId, 50 ether);
+        facility.repay(tokenId, 50 ether);
+
+        assertEq(facility.collectable(tokenId), 50 ether);
+
+        // Second repay accumulates
+        _repayToken(tokenId, 20 ether);
+
+        assertEq(facility.collectable(tokenId), 70 ether);
+    }
+
+    function testRevertRepayZeroAmount() public {
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+
+        vm.expectRevert("NFATFacility/zero-amount");
+        facility.repay(tokenId, 0);
+    }
+
+    function testRevertRepayInvalidToken() public {
+        vm.expectRevert("NFATFacility/invalid-token");
+        facility.repay(999, 1 ether);
+    }
+
+    // --- Collect ---
+
+    function testCollect() public {
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+        _repayToken(tokenId, 80 ether);
+
+        uint256 balBefore = susds.balanceOf(prime1);
+
+        // Partial collect
+        vm.expectEmit(true, true, true, true);
+        emit Collect(tokenId, 30 ether);
+        vm.prank(prime1); facility.collect(tokenId, 30 ether);
+
+        assertEq(facility.collectable(tokenId), 50 ether);
+        assertEq(susds.balanceOf(prime1), balBefore + 30 ether);
+
+        // Collect remainder
+        vm.prank(prime1); facility.collect(tokenId, 50 ether);
+
+        assertEq(facility.collectable(tokenId), 0);
+        assertEq(susds.balanceOf(prime1), balBefore + 80 ether);
+    }
+
+    function testCollectAfterTransfer() public {
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+        _repayToken(tokenId, 50 ether);
+
+        vm.prank(prime1); facility.transferFrom(prime1, prime2, tokenId);
+
+        assertEq(facility.collectable(tokenId), 50 ether);
+
+        uint256 balBefore = susds.balanceOf(prime2);
+        vm.prank(prime2); facility.collect(tokenId, 50 ether);
+
+        assertEq(facility.collectable(tokenId), 0);
+        assertEq(susds.balanceOf(prime2), balBefore + 50 ether);
+    }
+
+    function testCollectWithIdentityNetwork() public {
+        vm.prank(pauseProxy); facility.file("identityNetwork", address(idNet));
+        idNet.setMember(prime1, true);
+
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+        _repayToken(tokenId, 50 ether);
+
+        uint256 balBefore = susds.balanceOf(prime1);
+        vm.prank(prime1); facility.collect(tokenId, 50 ether);
+
+        assertEq(facility.collectable(tokenId), 0);
+        assertEq(susds.balanceOf(prime1), balBefore + 50 ether);
+    }
+
+    function testRevertCollectZeroAmount() public {
+        vm.expectRevert("NFATFacility/zero-amount");
+        vm.prank(prime1); facility.collect(0, 0);
+    }
+
+    function testRevertCollectInsufficientCollectable() public {
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+        _repayToken(tokenId, 10 ether);
+
+        vm.expectRevert("NFATFacility/insufficient-collectable");
+        vm.prank(prime1); facility.collect(tokenId, 11 ether);
+    }
+
+    function testRevertCollectNotOwner() public {
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+        _repayToken(tokenId, 50 ether);
+
+        vm.expectRevert("NFATFacility/not-owner");
+        vm.prank(prime2); facility.collect(tokenId, 50 ether);
+    }
+
+    function testRevertCollectNotMember() public {
+        vm.prank(pauseProxy); facility.file("identityNetwork", address(idNet));
+        idNet.setMember(prime1, true);
+
+        _subscribe(prime1, 100 ether);
+        uint256 tokenId = _issue(prime1, 100 ether);
+        _repayToken(tokenId, 50 ether);
+
+        idNet.setMember(prime1, false);
+
+        vm.expectRevert("NFATFacility/not-member");
+        vm.prank(prime1); facility.collect(tokenId, 50 ether);
     }
 
     // --- ERC-721 ---
@@ -747,6 +761,7 @@ contract NFATFacilityTest is DssTest {
         assertEq(facility.symbol(), "NFAT-HALO1");
         assertTrue(facility.supportsInterface(0x01ffc9a7));  // ERC-165
         assertTrue(facility.supportsInterface(0x80ac58cd));  // ERC-721
+        assertTrue(facility.supportsInterface(0x5b5e139f));  // ERC-721 Metadata
         assertTrue(!facility.supportsInterface(0xdeadbeef)); // random
     }
 }
