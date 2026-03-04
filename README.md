@@ -2,7 +2,7 @@
 
 An NFAT Facility manages bespoke capital deployment deals between depositors (Primes) and borrowers (Halos).
 
-- **Subscribe**: Depositors queue an asset (sUSDS) into the facility.
+- **Subscribe**: Depositors queue an asset (e.g. sUSDS) into the facility.
 - **Withdraw**: Depositors can at any time withdraw queued funds not yet deployed.
 - **Issue**: The operator deploys queued capital to the borrower and mints an ERC-721 Non-Fungible Allocation Token (NFAT) to the depositor, representing their claim on future repayments.
 - **Repay**: The borrower repays into the facility against a given NFAT.
