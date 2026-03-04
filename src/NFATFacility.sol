@@ -30,16 +30,16 @@ interface IdentityNetworkLike {
 contract NFATFacility is ERC721 {
 
     mapping(address usr       => uint256 allowed) public wards;
-    mapping(address usr       => uint256 allowed) public buds;     // Operator(s)
-    mapping(address usr       => uint256 allowed) public cops;     // Freezers
+    mapping(address usr       => uint256 allowed) public buds; // Operator(s)
+    mapping(address usr       => uint256 allowed) public cops; // Freezers
     mapping(address depositor => uint256 amount)  public deposits;
     mapping(uint256 tokenId   => uint256 amount)  public collectable;
-    address             public recipient;  // Destination of funds claimed by the operator
+    address             public recipient; // Destination of funds claimed by the operator
     IdentityNetworkLike public identityNetwork;
     bool                public stopped;
     string              public baseURI;
 
-    GemLike public immutable gem;        // Underlying asset
+    GemLike public immutable gem; // Underlying asset
 
     event Rely(address indexed usr);
     event Deny(address indexed usr);

@@ -38,6 +38,7 @@ struct NFATConfig {
 }
 
 // Note: deployment scripts assume L1; adapt for L2
+// Note: `stopped` is initially false
 library NFATInit {
 
     function init(
