@@ -149,6 +149,27 @@ contract NFATFacilityFactoryTest is DssTest {
         );
     }
 
+    function testDeployRevertWardZero() public {
+        vm.expectRevert("NFATFacilityFactory/ward-zero-address");
+        factory.deploy(
+            "Halo", "HALO", "", gem, recipient, idNet, _arr(ward1, address(0)), _arr(bud1), _arr(cop1)
+        );
+    }
+
+    function testDeployRevertBudZero() public {
+        vm.expectRevert("NFATFacilityFactory/bud-zero-address");
+        factory.deploy(
+            "Halo", "HALO", "", gem, recipient, idNet, _arr(ward1), _arr(bud1, address(0)), _arr(cop1)
+        );
+    }
+
+    function testDeployRevertCopZero() public {
+        vm.expectRevert("NFATFacilityFactory/cop-zero-address");
+        factory.deploy(
+            "Halo", "HALO", "", gem, recipient, idNet, _arr(ward1), _arr(bud1), _arr(cop1, address(0))
+        );
+    }
+
     // --- Interface conformance ---
 
     // Calling through the published INFATFactory interface must wire the facility identically to a

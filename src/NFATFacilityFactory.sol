@@ -80,14 +80,17 @@ contract NFATFacilityFactory is INFATFactory {
         // Step 2: Grant roles
 
         for (uint256 i = 0; i < wards.length; i++) {
+            require(wards[i] != address(0), "NFATFacilityFactory/ward-zero-address");
             facility.rely(wards[i]);
         }
 
         for (uint256 i = 0; i < buds.length; i++) {
+            require(buds[i] != address(0), "NFATFacilityFactory/bud-zero-address");
             facility.kiss(buds[i]);
         }
 
         for (uint256 i; i < cops.length; i++) {
+            require(cops[i] != address(0), "NFATFacilityFactory/cop-zero-address");
             facility.addFreezer(cops[i]);
         }
 
