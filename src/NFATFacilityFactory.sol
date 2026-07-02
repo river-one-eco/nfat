@@ -18,7 +18,7 @@ pragma solidity ^0.8.24;
 
 import { NFATFacility } from "./NFATFacility.sol";
 
-interface INFATFactory {
+interface INFATFacilityFactory {
 
     function deploy(
         string    memory name,
@@ -32,30 +32,23 @@ interface INFATFactory {
         address[] memory cops
     ) external returns (address);
 
-}
-
-contract NFATFacilityFactory is INFATFactory {
-
-    /**********************************************************************************************/
-    /*** Events                                                                                 ***/
-    /**********************************************************************************************/
 
     event FacilityDeployed(
         address   indexed facility,
         string            name,
         string            symbol,
         string            baseURI,
-        address           gem,
-        address           recipient,
+        address   indexed gem,
+        address   indexed recipient,
         address           identityNetwork,
         address[]         wards,
         address[]         buds,
         address[]         cops
     );
 
-    /**********************************************************************************************/
-    /*** External Interactive Functions                                                         ***/
-    /**********************************************************************************************/
+}
+
+contract NFATFacilityFactory is INFATFacilityFactory {
 
     function deploy(
         string    memory name,
@@ -75,7 +68,7 @@ contract NFATFacilityFactory is INFATFactory {
 
         // Step 1: Deploy the new facility contract.
 
-        NFATFacility facility = new NFATFacility({gem_: gem, name_: name, symbol_: symbol});
+        NFATFacility facility = new NFATFacility({ gem_: gem, name_: name, symbol_: symbol });
 
         // Step 2: Grant roles
 

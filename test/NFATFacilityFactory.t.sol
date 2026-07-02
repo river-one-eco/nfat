@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import "dss-test/DssTest.sol";
 import { NFATFacility }                      from "src/NFATFacility.sol";
-import { NFATFacilityFactory, INFATFactory } from "src/NFATFacilityFactory.sol";
+import { NFATFacilityFactory, INFATFacilityFactory } from "src/NFATFacilityFactory.sol";
 
 contract NFATFacilityFactoryTest is DssTest {
     DssInstance dss;
@@ -19,19 +19,6 @@ contract NFATFacilityFactoryTest is DssTest {
     address bud2      = makeAddr("bud2");
     address cop1      = makeAddr("cop1");
     address cop2      = makeAddr("cop2");
-
-    event FacilityDeployed(
-        address   indexed facility,
-        string            name,
-        string            symbol,
-        string            baseURI,
-        address           gem,
-        address           recipient,
-        address           identityNetwork,
-        address[]         wards,
-        address[]         buds,
-        address[]         cops
-    );
 
     function setUp() public {
         vm.createSelectFork(vm.envString("ETH_RPC_URL"));
@@ -68,8 +55,8 @@ contract NFATFacilityFactoryTest is DssTest {
 
         address predicted = _predictFacility();
 
-        vm.expectEmit(true, true, true, true);
-        emit FacilityDeployed(
+        vm.expectEmit(address(factory));
+        emit INFATFacilityFactory.FacilityDeployed(
             predicted, "Halo", "HALO", "ipfs://base/", gem, recipient, idNet, wards, buds, cops
         );
 
@@ -172,11 +159,11 @@ contract NFATFacilityFactoryTest is DssTest {
 
     // --- Interface conformance ---
 
-    // Calling through the published INFATFactory interface must wire the facility identically to a
+    // Calling through the published INFATFacilityFactory interface must wire the facility identically to a
     // direct call — i.e. the interface's argument order matches the implementation (no gem/recipient
     // swap, no wards/buds/cops rotation).
     function testDeployViaInterface() public {
-        address facility_ = INFATFactory(address(factory)).deploy(
+        address facility_ = INFATFacilityFactory(address(factory)).deploy(
             "Halo", "HALO", "ipfs://base/", gem, recipient, idNet, _arr(ward1), _arr(bud1), _arr(cop1)
         );
 
