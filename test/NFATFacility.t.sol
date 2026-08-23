@@ -64,7 +64,7 @@ contract NFATFacilityTest is DssTest {
     event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
 
     function setUp() public {
-        vm.createSelectFork(vm.envString("ETH_RPC_URL"));
+        vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
 
         dss        = MCD.loadFromChainlog(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
         pauseProxy = dss.chainlog.getAddress("MCD_PAUSE_PROXY");
@@ -74,9 +74,11 @@ contract NFATFacilityTest is DssTest {
         receiver    = new ERC721ReceiverMock();
         badReceiver = new BadReceiverMock();
 
-        address facility_ = NFATDeploy.deploy(address(this), pauseProxy, "Non-Fungible Allocation Token - Halo1", "NFAT-HALO1");
+        address facility_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "Non-Fungible Allocation Token - Halo1", "NFAT-HALO1");
         facility = NFATFacility(facility_);
 
+        address[] memory _operators = new address[](1);
+        _operators[0] = operator;
         address[] memory _freezers = new address[](1);
         _freezers[0] = freezer;
         NFATConfig memory cfg = NFATConfig({
@@ -85,9 +87,8 @@ contract NFATFacilityTest is DssTest {
             almProxy:        almProxy,
             identityNetwork: address(0),
             baseURI:         "",
-            operator:        operator,
-            freezers:        _freezers,
-            facilityKey:     "NFAT_FAC_HALO1"
+            operators:       _operators,
+            freezers:        _freezers
         });
         vm.startPrank(pauseProxy);
         NFATInit.init(dss, facility_, cfg);
@@ -132,7 +133,9 @@ contract NFATFacilityTest is DssTest {
     // --- Deploy & Init ---
 
     function testDeployAndInit() public {
-        address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SomeName", "SomeSymb");
+        address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
+        address[] memory operators = new address[](1);
+        operators[0] = address(0xbbb);
         address[] memory cops = new address[](2);
         cops[0] = address(0xff1);
         cops[1] = address(0xff2);
@@ -142,9 +145,8 @@ contract NFATFacilityTest is DssTest {
             almProxy:        address(0xaaa),
             identityNetwork: address(0x111),
             baseURI:         "someURI",
-            operator:        address(0xbbb),
-            freezers:        cops,
-            facilityKey:     "FAC_KEY"
+            operators:       operators,
+            freezers:        cops
         });
         vm.startPrank(pauseProxy);
         NFATInit.init(dss, f_, cfg);
@@ -159,10 +161,35 @@ contract NFATFacilityTest is DssTest {
         assertEq(f.recipient(), address(0xaaa));
         assertEq(address(f.identityNetwork()), address(0x111));
         assertEq(f.baseURI(), "someURI");
+        assertEq(f.buds(address(0xaaa)), 1); // ALMProxy is kissed as a bud (recipient + bud invariant)
         assertEq(f.buds(address(0xbbb)), 1);
         assertEq(f.cops(cops[0]), 1);
         assertEq(f.cops(cops[1]), 1);
-        assertEq(dss.chainlog.getAddress("FAC_KEY"), f_);
+    }
+
+
+    function testDeployAndInitWithUsdsGem() public {
+        address usds = dss.chainlog.getAddress("USDS");
+
+        address f_ = NFATDeploy.deploy(address(this), pauseProxy, "USDS", "UsdsName", "UsdsSymb");
+
+        NFATConfig memory cfg = NFATConfig({
+            name:            "UsdsName",
+            symbol:          "UsdsSymb",
+            almProxy:        address(0xaaa),
+            identityNetwork: address(0),
+            baseURI:         "",
+            operators:       new address[](0),
+            freezers:        new address[](0)
+        });
+        vm.startPrank(pauseProxy);
+        NFATInit.init(dss, f_, cfg);
+        vm.stopPrank();
+
+        NFATFacility f = NFATFacility(f_);
+        assertEq(address(f.gem()), usds);
+        assertEq(f.recipient(),    address(0xaaa));
+        assertEq(f.buds(address(0xaaa)), 1);
     }
 
     // --- Access Control ---

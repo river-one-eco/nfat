@@ -34,9 +34,8 @@ struct NFATConfig {
     address   almProxy;
     address   identityNetwork;
     string    baseURI;
-    address   operator;
+    address[] operators;
     address[] freezers;
-    bytes32   facilityKey;
 }
 
 // Note: deployment scripts assume L1; adapt for L2
@@ -50,19 +49,37 @@ library NFATInit {
     ) internal {
         NFATFacilityLike facility = NFATFacilityLike(facility_);
 
-        require(facility.gem() == dss.chainlog.getAddress("SUSDS"), "NFATInit/gem-mismatch");
+        require(cfg.almProxy != address(0), "NFATInit/alm-proxy-zero-address");
+
+        address gem = facility.gem();
+        require(
+            gem == dss.chainlog.getAddress("USDS") || gem == dss.chainlog.getAddress("SUSDS"),
+            "NFATInit/gem-not-usds-or-susds"
+        );
         require(keccak256(bytes(facility.name()))   == keccak256(bytes(cfg.name)),   "NFATInit/name-mismatch");
         require(keccak256(bytes(facility.symbol())) == keccak256(bytes(cfg.symbol)), "NFATInit/symbol-mismatch");
 
+        // Structural wiring: the shared ALMProxy is both the recipient and a bud. This encodes the
+        // invariant previously guaranteed atomically by the retired DefaultNFATPAUAssembler.
         facility.file("recipient", cfg.almProxy);
-        facility.file("identityNetwork", cfg.identityNetwork);
-        facility.file("baseURI", cfg.baseURI);
+        facility.kiss(cfg.almProxy);
 
-        facility.kiss(cfg.operator);
+        // Optional files are skipped when unset (mirroring the previous factory behavior).
+        if (cfg.identityNetwork != address(0)) facility.file("identityNetwork", cfg.identityNetwork);
+        if (bytes(cfg.baseURI).length > 0)     facility.file("baseURI",         cfg.baseURI);
+
+        for (uint256 i = 0; i < cfg.operators.length; ++i) {
+            require(cfg.operators[i] != address(0), "NFATInit/operator-zero-address");
+            facility.kiss(cfg.operators[i]);
+        }
         for (uint256 i = 0; i < cfg.freezers.length; ++i) {
+            require(cfg.freezers[i] != address(0), "NFATInit/freezer-zero-address");
             facility.addFreezer(cfg.freezers[i]);
         }
 
-        dss.chainlog.setAddress(cfg.facilityKey, facility_);
+        // Note: no chainlog registration here. NFAT onboarding spells execute as a star SubProxy,
+        // which cannot write the Sky chainlog (PauseProxy-only); stars track addresses in their
+        // own address registry. If Sky core wants the facility in the chainlog, its own spell
+        // registers it.
     }
 }
