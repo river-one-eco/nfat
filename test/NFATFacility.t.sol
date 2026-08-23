@@ -167,6 +167,28 @@ contract NFATFacilityTest is DssTest {
         assertEq(f.cops(cops[1]), 1);
     }
 
+    // External wrapper so the internal (inlined) library call runs in its own frame and
+    // vm.expectRevert can catch the require.
+    function deployExternal(
+        address deployer,
+        address owner,
+        bytes32 gemKey,
+        string memory name,
+        string memory symbol
+    ) external returns (address facility) {
+        facility = NFATDeploy.deploy(deployer, owner, gemKey, name, symbol);
+    }
+
+    function testRevertDeployZeroOwner() public {
+        // A zero owner would leave the facility with no real ward after switchOwner.
+        vm.expectRevert("NFATDeploy/owner-zero-address");
+        this.deployExternal(address(this), address(0), "SUSDS", "SomeName", "SomeSymb");
+    }
+
+    function testRevertDeployInvalidGemKey() public {
+        vm.expectRevert("NFATDeploy/gem-not-usds-or-susds");
+        this.deployExternal(address(this), pauseProxy, "DAI", "SomeName", "SomeSymb");
+    }
 
     function testDeployAndInitWithUsdsGem() public {
         address usds = dss.chainlog.getAddress("USDS");
