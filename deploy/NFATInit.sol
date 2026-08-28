@@ -29,6 +29,7 @@ interface NFATFacilityLike {
 }
 
 struct NFATConfig {
+    bytes32   gemKey;
     string    name;
     string    symbol;
     address   almProxy;
@@ -51,11 +52,11 @@ library NFATInit {
 
         require(cfg.almProxy != address(0), "NFATInit/alm-proxy-zero-address");
 
-        address gem = facility.gem();
-        require(
-            gem == dss.chainlog.getAddress("USDS") || gem == dss.chainlog.getAddress("SUSDS"),
-            "NFATInit/gem-not-usds-or-susds"
-        );
+        // Validate the configured gem key explicitly so a typo in the deploy config (e.g. "USDS"
+        // where "SUSDS" was intended) is caught here rather than silently deploying against the
+        // wrong gem, then assert the facility's gem matches that key's chainlog address.
+        require(cfg.gemKey == "USDS" || cfg.gemKey == "SUSDS", "NFATInit/gem-key-not-usds-or-susds");
+        require(facility.gem() == dss.chainlog.getAddress(cfg.gemKey), "NFATInit/gem-mismatch");
         require(keccak256(bytes(facility.name()))   == keccak256(bytes(cfg.name)),   "NFATInit/name-mismatch");
         require(keccak256(bytes(facility.symbol())) == keccak256(bytes(cfg.symbol)), "NFATInit/symbol-mismatch");
 

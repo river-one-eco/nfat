@@ -82,6 +82,7 @@ contract NFATFacilityTest is DssTest {
         address[] memory _freezers = new address[](1);
         _freezers[0] = freezer;
         NFATConfig memory cfg = NFATConfig({
+            gemKey:          "SUSDS",
             name:            "Non-Fungible Allocation Token - Halo1",
             symbol:          "NFAT-HALO1",
             almProxy:        almProxy,
@@ -140,6 +141,7 @@ contract NFATFacilityTest is DssTest {
         cops[0] = address(0xff1);
         cops[1] = address(0xff2);
         NFATConfig memory cfg = NFATConfig({
+            gemKey:          "SUSDS",
             name:            "SomeName",
             symbol:          "SomeSymb",
             almProxy:        address(0xaaa),
@@ -196,6 +198,7 @@ contract NFATFacilityTest is DssTest {
         address f_ = NFATDeploy.deploy(address(this), pauseProxy, "USDS", "UsdsName", "UsdsSymb");
 
         NFATConfig memory cfg = NFATConfig({
+            gemKey:          "USDS",
             name:            "UsdsName",
             symbol:          "UsdsSymb",
             almProxy:        address(0xaaa),
@@ -212,6 +215,42 @@ contract NFATFacilityTest is DssTest {
         assertEq(address(f.gem()), usds);
         assertEq(f.recipient(),    address(0xaaa));
         assertEq(f.buds(address(0xaaa)), 1);
+    }
+
+    // External wrapper so the internal (inlined) library call runs in its own frame and
+    // vm.expectRevert can catch the require.
+    function initExternal(address facility_, NFATConfig memory cfg) external {
+        NFATInit.init(dss, facility_, cfg);
+    }
+
+    function _initCfg(bytes32 gemKey, string memory name, string memory symbol)
+        internal pure returns (NFATConfig memory cfg)
+    {
+        cfg = NFATConfig({
+            gemKey:          gemKey,
+            name:            name,
+            symbol:          symbol,
+            almProxy:        address(0xaaa),
+            identityNetwork: address(0),
+            baseURI:         "",
+            operators:       new address[](0),
+            freezers:        new address[](0)
+        });
+    }
+
+    function testRevertInitInvalidGemKey() public {
+        address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg("DAI", "SomeName", "SomeSymb");
+        vm.expectRevert("NFATInit/gem-key-not-usds-or-susds");
+        this.initExternal(f_, cfg);
+    }
+
+    function testRevertInitGemMismatch() public {
+        // Facility's gem is SUSDS, but the config declares USDS: a valid key that does not match.
+        address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg("USDS", "SomeName", "SomeSymb");
+        vm.expectRevert("NFATInit/gem-mismatch");
+        this.initExternal(f_, cfg);
     }
 
     // --- Access Control ---
