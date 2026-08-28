@@ -50,6 +50,7 @@ library NFATInit {
     ) internal {
         NFATFacilityLike facility = NFATFacilityLike(facility_);
 
+        require(facility_    != address(0), "NFATInit/facility-zero-address");
         require(cfg.almProxy != address(0), "NFATInit/alm-proxy-zero-address");
 
         // Validate the configured gem key explicitly

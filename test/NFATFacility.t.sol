@@ -253,6 +253,12 @@ contract NFATFacilityTest is DssTest {
         this.initExternal(f_, cfg);
     }
 
+    function testRevertInitZeroFacility() public {
+        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        vm.expectRevert("NFATInit/facility-zero-address");
+        this.initExternal(address(0), cfg);
+    }
+
     // --- Access Control ---
 
     function testAuth() public {
