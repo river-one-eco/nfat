@@ -64,7 +64,7 @@ contract NFATFacilityTest is DssTest {
     event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
 
     function setUp() public {
-        vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
+        vm.createSelectFork(vm.envString("ETH_RPC_URL"));
 
         dss        = MCD.loadFromChainlog(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
         pauseProxy = dss.chainlog.getAddress("MCD_PAUSE_PROXY");

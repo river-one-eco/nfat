@@ -6,7 +6,7 @@ certora-nfat :; PATH=${PATH} certoraRun certora/NFATFacility.conf$(if $(rule), -
 # --------------------------------------------------------------------------------------------------
 # Prerequisites:
 #   - ETH_FROM: deployer address
-#   - MAINNET_RPC_URL: chain RPC URL
+#   - ETH_RPC_URL: chain RPC URL
 #   - MAINNET_API_KEY: Etherscan key (for --verify)
 #   - ENV: config slug; reads script/input/{chainId}/nfat-$(ENV).json (owner, gem, name, symbol)
 #     owner = the operating star's SubProxy (sole ward; the onboarding spell executes as it)
@@ -19,8 +19,8 @@ certora-nfat :; PATH=${PATH} certoraRun certora/NFATFacility.conf$(if $(rule), -
 deploy-nfat-mainnet:
 	forge script script/DeployNFAT.s.sol:DeployNFAT \
 		--sender $(ETH_FROM) --account deployer --broadcast \
-		--verify --retries 10 --delay 10 --rpc-url $(MAINNET_RPC_URL)
+		--verify --retries 10 --delay 10 --rpc-url $(ETH_RPC_URL)
 
 deploy-nfat-mainnet-dryrun:
 	forge script script/DeployNFAT.s.sol:DeployNFAT \
-		--sender $(ETH_FROM) --account deployer --rpc-url $(MAINNET_RPC_URL)
+		--sender $(ETH_FROM) --account deployer --rpc-url $(ETH_RPC_URL)
