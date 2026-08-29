@@ -259,6 +259,53 @@ contract NFATFacilityTest is DssTest {
         this.initExternal(address(0), cfg);
     }
 
+    function testRevertInitZeroAlmProxy() public {
+        // Reverts on the first require, before any facility call, so ownership is irrelevant.
+        address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        cfg.almProxy = address(0);
+        vm.expectRevert("NFATInit/alm-proxy-zero-address");
+        this.initExternal(f_, cfg);
+    }
+
+    function testRevertInitZeroOperator() public {
+        // Deploy owned by the test contract (deployer == owner, so switchOwner is a no-op) so
+        // init's kiss/file calls pass auth and execution reaches the operator loop.
+        address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        cfg.operators = new address[](1);
+        cfg.operators[0] = address(0);
+        vm.expectRevert("NFATInit/operator-zero-address");
+        this.initExternal(f_, cfg);
+    }
+
+    function testRevertInitZeroFreezer() public {
+        address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        cfg.freezers = new address[](1);
+        cfg.freezers[0] = address(0);
+        vm.expectRevert("NFATInit/freezer-zero-address");
+        this.initExternal(f_, cfg);
+    }
+
+    function testInitSkipsOptionalFilesWhenUnset() public {
+        // Deploy owned by the test contract so we can pre-file the optional fields.
+        address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
+        NFATFacility f = NFATFacility(f_);
+
+        // Pre-set the optional fields to non-default values.
+        f.file("identityNetwork", address(0x1234));
+        f.file("baseURI", "preset://uri");
+
+        // Init with identityNetwork == address(0) and baseURI == "" must leave the pre-set
+        // values untouched — proving the skip, not merely that the fields are zero.
+        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        this.initExternal(f_, cfg);
+
+        assertEq(address(f.identityNetwork()), address(0x1234));
+        assertEq(f.baseURI(),                  "preset://uri");
+    }
+
     // --- Access Control ---
 
     function testAuth() public {
