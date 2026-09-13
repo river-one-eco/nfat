@@ -253,6 +253,39 @@ contract NFATFacilityTest is DssTest {
         this.initExternal(f_, cfg);
     }
 
+    function testRevertInitNameMismatch() public {
+        address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg("SUSDS", "OtherName", "SomeSymb");
+        vm.expectRevert("NFATInit/name-mismatch");
+        this.initExternal(f_, cfg);
+    }
+
+    function testRevertInitSymbolMismatch() public {
+        address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "OtherSymb");
+        vm.expectRevert("NFATInit/symbol-mismatch");
+        this.initExternal(f_, cfg);
+    }
+
+    function testRevertInitAlreadyInitialized() public {
+        // Deploy owned by the test contract so the first init passes auth.
+        address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        this.initExternal(f_, cfg);
+        assertEq(NFATFacility(f_).recipient(), address(0xaaa));
+
+        // A second run, even with a different ALMProxy, must be refused rather than leaving the
+        // old proxy behind as a bud.
+        cfg.almProxy = address(0xbbb);
+        vm.expectRevert("NFATInit/recipient-already-set");
+        this.initExternal(f_, cfg);
+
+        // Same params is refused too (no silent no-op).
+        cfg.almProxy = address(0xaaa);
+        vm.expectRevert("NFATInit/recipient-already-set");
+        this.initExternal(f_, cfg);
+    }
+
     function testRevertInitZeroFacility() public {
         NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
         vm.expectRevert("NFATInit/facility-zero-address");
