@@ -77,8 +77,6 @@ contract NFATFacilityTest is DssTest {
         address facility_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "Non-Fungible Allocation Token - Halo1", "NFAT-HALO1");
         facility = NFATFacility(facility_);
 
-        address[] memory _operators = new address[](1);
-        _operators[0] = operator;
         address[] memory _freezers = new address[](1);
         _freezers[0] = freezer;
         NFATConfig memory cfg = NFATConfig({
@@ -88,11 +86,13 @@ contract NFATFacilityTest is DssTest {
             almProxy:        almProxy,
             identityNetwork: address(0),
             baseURI:         "",
-            operators:       _operators,
             freezers:        _freezers
         });
         vm.startPrank(pauseProxy);
         NFATInit.init(dss, facility_, cfg);
+        // Init only kisses the ALMProxy. Kiss a separate test-only issuer so the facility tests can
+        // exercise issue() without conflating the issuer with the recipient.
+        facility.kiss(operator);
         vm.stopPrank();
 
         deal(address(susds), prime1, 1000 ether);
@@ -135,8 +135,6 @@ contract NFATFacilityTest is DssTest {
 
     function testDeployAndInit() public {
         address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
-        address[] memory operators = new address[](1);
-        operators[0] = address(0xbbb);
         address[] memory cops = new address[](2);
         cops[0] = address(0xff1);
         cops[1] = address(0xff2);
@@ -147,7 +145,6 @@ contract NFATFacilityTest is DssTest {
             almProxy:        address(0xaaa),
             identityNetwork: address(0x111),
             baseURI:         "someURI",
-            operators:       operators,
             freezers:        cops
         });
         vm.startPrank(pauseProxy);
@@ -164,7 +161,8 @@ contract NFATFacilityTest is DssTest {
         assertEq(address(f.identityNetwork()), address(0x111));
         assertEq(f.baseURI(), "someURI");
         assertEq(f.buds(address(0xaaa)), 1); // ALMProxy is kissed as a bud (recipient + bud invariant)
-        assertEq(f.buds(address(0xbbb)), 1);
+        assertEq(f.buds(address(this)),  0); // no one else is kissed: the ALMProxy is the sole issuer
+        assertEq(f.buds(pauseProxy),     0);
         assertEq(f.cops(cops[0]), 1);
         assertEq(f.cops(cops[1]), 1);
     }
@@ -204,7 +202,6 @@ contract NFATFacilityTest is DssTest {
             almProxy:        address(0xaaa),
             identityNetwork: address(0),
             baseURI:         "",
-            operators:       new address[](0),
             freezers:        new address[](0)
         });
         vm.startPrank(pauseProxy);
@@ -233,7 +230,6 @@ contract NFATFacilityTest is DssTest {
             almProxy:        address(0xaaa),
             identityNetwork: address(0),
             baseURI:         "",
-            operators:       new address[](0),
             freezers:        new address[](0)
         });
     }
@@ -301,18 +297,9 @@ contract NFATFacilityTest is DssTest {
         this.initExternal(f_, cfg);
     }
 
-    function testRevertInitZeroOperator() public {
-        // Deploy owned by the test contract (deployer == owner, so switchOwner is a no-op) so
-        // init's kiss/file calls pass auth and execution reaches the operator loop.
-        address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
-        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
-        cfg.operators = new address[](1);
-        cfg.operators[0] = address(0);
-        vm.expectRevert("NFATInit/operator-zero-address");
-        this.initExternal(f_, cfg);
-    }
-
     function testRevertInitZeroFreezer() public {
+        // Deploy owned by the test contract (deployer == owner, so switchOwner is a no-op) so
+        // init's kiss/file calls pass auth and execution reaches the freezer loop.
         address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
         NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
         cfg.freezers = new address[](1);

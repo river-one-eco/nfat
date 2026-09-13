@@ -36,7 +36,6 @@ struct NFATConfig {
     address   almProxy;
     address   identityNetwork;
     string    baseURI;
-    address[] operators;
     address[] freezers;
 }
 
@@ -64,8 +63,10 @@ library NFATInit {
         require(keccak256(bytes(facility.name()))   == keccak256(bytes(cfg.name)),   "NFATInit/name-mismatch");
         require(keccak256(bytes(facility.symbol())) == keccak256(bytes(cfg.symbol)), "NFATInit/symbol-mismatch");
 
-        // Structural wiring: the shared ALMProxy is both the recipient and a bud. This encodes the
-        // invariant previously guaranteed atomically by the retired DefaultNFATPAUAssembler.
+        // Structural wiring: the shared ALMProxy is both the recipient and the sole bud. This encodes
+        // the invariant previously guaranteed atomically by the retired DefaultNFATPAUAssembler.
+        // No additional operators are kissed: the Halo NFAT facet only tracks issuances made through
+        // the ALMProxy, so a third-party issuer would create positions it cannot account for or repay.
         facility.file("recipient", cfg.almProxy);
         facility.kiss(cfg.almProxy);
 
@@ -73,10 +74,6 @@ library NFATInit {
         if (cfg.identityNetwork != address(0)) facility.file("identityNetwork", cfg.identityNetwork);
         if (bytes(cfg.baseURI).length > 0)     facility.file("baseURI",         cfg.baseURI);
 
-        for (uint256 i = 0; i < cfg.operators.length; ++i) {
-            require(cfg.operators[i] != address(0), "NFATInit/operator-zero-address");
-            facility.kiss(cfg.operators[i]);
-        }
         for (uint256 i = 0; i < cfg.freezers.length; ++i) {
             require(cfg.freezers[i] != address(0), "NFATInit/freezer-zero-address");
             facility.addFreezer(cfg.freezers[i]);
