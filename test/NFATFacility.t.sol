@@ -282,12 +282,6 @@ contract NFATFacilityTest is DssTest {
         this.initExternal(f_, cfg);
     }
 
-    function testRevertInitZeroFacility() public {
-        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
-        vm.expectRevert("NFATInit/facility-zero-address");
-        this.initExternal(address(0), cfg);
-    }
-
     function testRevertInitZeroAlmProxy() public {
         // Reverts on the first require, before any facility call, so ownership is irrelevant.
         address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");

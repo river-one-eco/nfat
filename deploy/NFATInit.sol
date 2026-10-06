@@ -50,7 +50,6 @@ library NFATInit {
     ) internal {
         NFATFacilityLike facility = NFATFacilityLike(facility_);
 
-        require(facility_    != address(0), "NFATInit/facility-zero-address");
         require(cfg.almProxy != address(0), "NFATInit/alm-proxy-zero-address");
 
         // Block re-initialization: a second run could not cleanly re-wire the facility for a
