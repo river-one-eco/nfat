@@ -22,7 +22,7 @@ import { ScriptTools } from "dss-test/ScriptTools.sol";
 
 import { NFATDeploy } from "deploy/NFATDeploy.sol";
 
-// Deploys an NFATFacility from source (the NFATFacilityFactory is retired) and hands sole ward to
+// Deploys an NFATFacility from source and hands sole ward to
 // `owner`, dropping the deployer. Mutable configuration (recipient/bud/cop wiring, files) is left
 // to the activation spell via {NFATInit}. Config: script/input/{chainId}/nfat-{ENV}.json.
 contract DeployNFAT is Script {

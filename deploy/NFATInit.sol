@@ -62,14 +62,13 @@ library NFATInit {
         require(keccak256(bytes(facility.name()))   == keccak256(bytes(cfg.name)),   "NFATInit/name-mismatch");
         require(keccak256(bytes(facility.symbol())) == keccak256(bytes(cfg.symbol)), "NFATInit/symbol-mismatch");
 
-        // Structural wiring: the shared ALMProxy is both the recipient and the sole bud. This encodes
-        // the invariant previously guaranteed atomically by the retired DefaultNFATPAUAssembler.
+        // Structural wiring: the shared ALMProxy is both the recipient and the sole bud.
         // No additional operators are kissed: the Halo NFAT facet only tracks issuances made through
         // the ALMProxy, so a third-party issuer would create positions it cannot account for or repay.
         facility.file("recipient", cfg.almProxy);
         facility.kiss(cfg.almProxy);
 
-        // Optional files are skipped when unset (mirroring the previous factory behavior).
+        // Optional files are skipped when unset.
         if (cfg.identityNetwork != address(0)) facility.file("identityNetwork", cfg.identityNetwork);
         if (bytes(cfg.baseURI).length > 0)     facility.file("baseURI",         cfg.baseURI);
 
