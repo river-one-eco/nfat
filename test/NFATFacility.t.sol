@@ -175,8 +175,8 @@ contract NFATFacilityTest is DssTest {
         bytes32 gemKey,
         string memory name,
         string memory symbol
-    ) external returns (address facility) {
-        facility = NFATDeploy.deploy(deployer, owner, gemKey, name, symbol);
+    ) external returns (address facility_) {
+        facility_ = NFATDeploy.deploy(deployer, owner, gemKey, name, symbol);
     }
 
     function testRevertDeployZeroOwner() public {
