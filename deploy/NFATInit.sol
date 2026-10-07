@@ -23,6 +23,8 @@ interface NFATFacilityLike {
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function recipient() external view returns (address);
+    function identityNetwork() external view returns (address);
+    function baseURI() external view returns (string memory);
     function file(bytes32, address) external;
     function file(bytes32, string calldata) external;
     function kiss(address) external;
@@ -52,9 +54,12 @@ library NFATInit {
 
         require(cfg.almProxy != address(0), "NFATInit/alm-proxy-zero-address");
 
-        // Block re-initialization: a second run could not cleanly re-wire the facility for a
-        // different ALMProxy (the previous recipient would remain a bud), so refuse outright.
+        // Block re-initialization: init is meant for a fresh facility, and a second run could not
+        // cleanly re-wire the facility for a different ALMProxy (the previous recipient would
+        // remain a bud), so refuse outright.
         require(facility.recipient() == address(0), "NFATInit/recipient-already-set");
+        require(facility.identityNetwork() == address(0), "NFATInit/identity-network-already-set");
+        require(bytes(facility.baseURI()).length == 0, "NFATInit/base-uri-already-set");
 
         // Validate the configured gem key explicitly
         require(cfg.gemKey == "USDS" || cfg.gemKey == "SUSDS", "NFATInit/gem-key-not-usds-or-susds");

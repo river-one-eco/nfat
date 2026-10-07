@@ -212,6 +212,8 @@ contract NFATFacilityTest is DssTest {
         assertEq(address(f.gem()), usds);
         assertEq(f.recipient(),    address(0xaaa));
         assertEq(f.buds(address(0xaaa)), 1);
+        assertEq(address(f.identityNetwork()), address(0));
+        assertEq(f.baseURI(), "");
     }
 
     // External wrapper so the internal (inlined) library call runs in its own frame and
@@ -302,22 +304,21 @@ contract NFATFacilityTest is DssTest {
         this.initExternal(f_, cfg);
     }
 
-    function testInitSkipsOptionalFilesWhenUnset() public {
-        // Deploy owned by the test contract so we can pre-file the optional fields.
+    function testRevertInitIdentityNetworkAlreadySet() public {
+        // Deploy owned by the test contract so we can pre-file the field.
         address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
-        NFATFacility f = NFATFacility(f_);
-
-        // Pre-set the optional fields to non-default values.
-        f.file("identityNetwork", address(0x1234));
-        f.file("baseURI", "preset://uri");
-
-        // Init with identityNetwork == address(0) and baseURI == "" must leave the pre-set
-        // values untouched — proving the skip, not merely that the fields are zero.
+        NFATFacility(f_).file("identityNetwork", address(0x1234));
         NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        vm.expectRevert("NFATInit/identity-network-already-set");
         this.initExternal(f_, cfg);
+    }
 
-        assertEq(address(f.identityNetwork()), address(0x1234));
-        assertEq(f.baseURI(),                  "preset://uri");
+    function testRevertInitBaseURIAlreadySet() public {
+        address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
+        NFATFacility(f_).file("baseURI", "preset://uri");
+        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        vm.expectRevert("NFATInit/base-uri-already-set");
+        this.initExternal(f_, cfg);
     }
 
     // --- Access Control ---
