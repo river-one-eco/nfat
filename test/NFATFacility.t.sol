@@ -34,6 +34,7 @@ contract NFATFacilityTest is DssTest {
     DssInstance           dss;
     address               pauseProxy;
     GemLike               susds;
+    GemLike               usds;
     IdentityNetworkMock   idNet;
     ERC721ReceiverMock    receiver;
     BadReceiverMock       badReceiver;
@@ -69,6 +70,7 @@ contract NFATFacilityTest is DssTest {
         dss        = MCD.loadFromChainlog(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
         pauseProxy = dss.chainlog.getAddress("MCD_PAUSE_PROXY");
         susds      = GemLike(dss.chainlog.getAddress("SUSDS"));
+        usds       = GemLike(dss.chainlog.getAddress("USDS"));
 
         idNet       = new IdentityNetworkMock();
         receiver    = new ERC721ReceiverMock();
@@ -80,7 +82,7 @@ contract NFATFacilityTest is DssTest {
         address[] memory _freezers = new address[](1);
         _freezers[0] = freezer;
         NFATConfig memory cfg = NFATConfig({
-            gemKey:          "SUSDS",
+            gem:             address(susds),
             name:            "Non-Fungible Allocation Token - Halo1",
             symbol:          "NFAT-HALO1",
             almProxy:        almProxy,
@@ -89,7 +91,7 @@ contract NFATFacilityTest is DssTest {
             freezers:        _freezers
         });
         vm.startPrank(pauseProxy);
-        NFATInit.init(dss, facility_, cfg);
+        NFATInit.init(facility_, cfg);
         // Init only kisses the ALMProxy. Kiss a separate test-only issuer so the facility tests can
         // exercise issue() without conflating the issuer with the recipient.
         facility.kiss(operator);
@@ -139,7 +141,7 @@ contract NFATFacilityTest is DssTest {
         cops[0] = address(0xff1);
         cops[1] = address(0xff2);
         NFATConfig memory cfg = NFATConfig({
-            gemKey:          "SUSDS",
+            gem:             address(susds),
             name:            "SomeName",
             symbol:          "SomeSymb",
             almProxy:        address(0xaaa),
@@ -148,7 +150,7 @@ contract NFATFacilityTest is DssTest {
             freezers:        cops
         });
         vm.startPrank(pauseProxy);
-        NFATInit.init(dss, f_, cfg);
+        NFATInit.init(f_, cfg);
         vm.stopPrank();
 
         NFATFacility f = NFATFacility(f_);
@@ -191,12 +193,11 @@ contract NFATFacilityTest is DssTest {
     }
 
     function testDeployAndInitWithUsdsGem() public {
-        address usds = dss.chainlog.getAddress("USDS");
 
         address f_ = NFATDeploy.deploy(address(this), pauseProxy, "USDS", "UsdsName", "UsdsSymb");
 
         NFATConfig memory cfg = NFATConfig({
-            gemKey:          "USDS",
+            gem:             address(usds),
             name:            "UsdsName",
             symbol:          "UsdsSymb",
             almProxy:        address(0xaaa),
@@ -205,11 +206,11 @@ contract NFATFacilityTest is DssTest {
             freezers:        new address[](0)
         });
         vm.startPrank(pauseProxy);
-        NFATInit.init(dss, f_, cfg);
+        NFATInit.init(f_, cfg);
         vm.stopPrank();
 
         NFATFacility f = NFATFacility(f_);
-        assertEq(address(f.gem()), usds);
+        assertEq(address(f.gem()), address(usds));
         assertEq(f.recipient(),    address(0xaaa));
         assertEq(f.buds(address(0xaaa)), 1);
         assertEq(address(f.identityNetwork()), address(0));
@@ -219,14 +220,14 @@ contract NFATFacilityTest is DssTest {
     // External wrapper so the internal (inlined) library call runs in its own frame and
     // vm.expectRevert can catch the require.
     function initExternal(address facility_, NFATConfig memory cfg) external {
-        NFATInit.init(dss, facility_, cfg);
+        NFATInit.init(facility_, cfg);
     }
 
-    function _initCfg(bytes32 gemKey, string memory name, string memory symbol)
+    function _initCfg(address gem, string memory name, string memory symbol)
         internal pure returns (NFATConfig memory cfg)
     {
         cfg = NFATConfig({
-            gemKey:          gemKey,
+            gem:             gem,
             name:            name,
             symbol:          symbol,
             almProxy:        address(0xaaa),
@@ -236,31 +237,24 @@ contract NFATFacilityTest is DssTest {
         });
     }
 
-    function testRevertInitInvalidGemKey() public {
-        address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
-        NFATConfig memory cfg = _initCfg("DAI", "SomeName", "SomeSymb");
-        vm.expectRevert("NFATInit/gem-key-not-usds-or-susds");
-        this.initExternal(f_, cfg);
-    }
-
     function testRevertInitGemMismatch() public {
-        // Facility's gem is SUSDS, but the config declares USDS: a valid key that does not match.
+        // Facility's gem is SUSDS, but the config declares USDS.
         address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
-        NFATConfig memory cfg = _initCfg("USDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg(address(usds), "SomeName", "SomeSymb");
         vm.expectRevert("NFATInit/gem-mismatch");
         this.initExternal(f_, cfg);
     }
 
     function testRevertInitNameMismatch() public {
         address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
-        NFATConfig memory cfg = _initCfg("SUSDS", "OtherName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg(address(susds), "OtherName", "SomeSymb");
         vm.expectRevert("NFATInit/name-mismatch");
         this.initExternal(f_, cfg);
     }
 
     function testRevertInitSymbolMismatch() public {
         address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
-        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "OtherSymb");
+        NFATConfig memory cfg = _initCfg(address(susds), "SomeName", "OtherSymb");
         vm.expectRevert("NFATInit/symbol-mismatch");
         this.initExternal(f_, cfg);
     }
@@ -268,7 +262,7 @@ contract NFATFacilityTest is DssTest {
     function testRevertInitAlreadyInitialized() public {
         // Deploy owned by the test contract so the first init passes auth.
         address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
-        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg(address(susds), "SomeName", "SomeSymb");
         this.initExternal(f_, cfg);
         assertEq(NFATFacility(f_).recipient(), address(0xaaa));
 
@@ -287,7 +281,7 @@ contract NFATFacilityTest is DssTest {
     function testRevertInitZeroAlmProxy() public {
         // Reverts on the first require, before any facility call, so ownership is irrelevant.
         address f_ = NFATDeploy.deploy(address(this), pauseProxy, "SUSDS", "SomeName", "SomeSymb");
-        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg(address(susds), "SomeName", "SomeSymb");
         cfg.almProxy = address(0);
         vm.expectRevert("NFATInit/alm-proxy-zero-address");
         this.initExternal(f_, cfg);
@@ -297,7 +291,7 @@ contract NFATFacilityTest is DssTest {
         // Deploy owned by the test contract (deployer == owner, so switchOwner is a no-op) so
         // init's kiss/file calls pass auth and execution reaches the freezer loop.
         address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
-        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg(address(susds), "SomeName", "SomeSymb");
         cfg.freezers = new address[](1);
         cfg.freezers[0] = address(0);
         vm.expectRevert("NFATInit/freezer-zero-address");
@@ -308,7 +302,7 @@ contract NFATFacilityTest is DssTest {
         // Deploy owned by the test contract so we can pre-file the field.
         address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
         NFATFacility(f_).file("identityNetwork", address(0x1234));
-        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg(address(susds), "SomeName", "SomeSymb");
         vm.expectRevert("NFATInit/identity-network-already-set");
         this.initExternal(f_, cfg);
     }
@@ -316,7 +310,7 @@ contract NFATFacilityTest is DssTest {
     function testRevertInitBaseURIAlreadySet() public {
         address f_ = NFATDeploy.deploy(address(this), address(this), "SUSDS", "SomeName", "SomeSymb");
         NFATFacility(f_).file("baseURI", "preset://uri");
-        NFATConfig memory cfg = _initCfg("SUSDS", "SomeName", "SomeSymb");
+        NFATConfig memory cfg = _initCfg(address(susds), "SomeName", "SomeSymb");
         vm.expectRevert("NFATInit/base-uri-already-set");
         this.initExternal(f_, cfg);
     }
@@ -430,15 +424,14 @@ contract NFATFacilityTest is DssTest {
         assertEq(susds.balanceOf(address(facility)), 0);
 
         // Rescue non-gem token
-        address usds = dss.chainlog.getAddress("USDS");
-        deal(usds, address(facility), 50 ether);
+        deal(address(usds), address(facility), 50 ether);
 
         vm.expectEmit(true, true, true, true);
-        emit Rescue(usds, rescueTo, 50 ether);
-        vm.prank(pauseProxy); facility.rescue(usds, rescueTo, 50 ether);
+        emit Rescue(address(usds), rescueTo, 50 ether);
+        vm.prank(pauseProxy); facility.rescue(address(usds), rescueTo, 50 ether);
 
-        assertEq(GemLike(usds).balanceOf(rescueTo), 50 ether);
-        assertEq(GemLike(usds).balanceOf(address(facility)), 0);
+        assertEq(usds.balanceOf(rescueTo), 50 ether);
+        assertEq(usds.balanceOf(address(facility)), 0);
     }
 
     function testRescueDeposit() public {

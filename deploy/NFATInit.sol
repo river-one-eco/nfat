@@ -16,8 +16,6 @@
 
 pragma solidity >=0.8.0;
 
-import { DssInstance } from "dss-test/MCD.sol";
-
 interface NFATFacilityLike {
     function gem() external view returns (address);
     function name() external view returns (string memory);
@@ -32,7 +30,7 @@ interface NFATFacilityLike {
 }
 
 struct NFATConfig {
-    bytes32   gemKey;
+    address   gem;
     string    name;
     string    symbol;
     address   almProxy;
@@ -45,11 +43,7 @@ struct NFATConfig {
 // Note: `stopped` is initially false
 library NFATInit {
 
-    function init(
-        DssInstance memory dss,
-        address     facility_,
-        NFATConfig  memory cfg
-    ) internal {
+    function init(address facility_, NFATConfig memory cfg) internal {
         NFATFacilityLike facility = NFATFacilityLike(facility_);
 
         require(cfg.almProxy != address(0), "NFATInit/alm-proxy-zero-address");
@@ -61,9 +55,8 @@ library NFATInit {
         require(facility.identityNetwork() == address(0), "NFATInit/identity-network-already-set");
         require(bytes(facility.baseURI()).length == 0, "NFATInit/base-uri-already-set");
 
-        // Validate the configured gem key explicitly
-        require(cfg.gemKey == "USDS" || cfg.gemKey == "SUSDS", "NFATInit/gem-key-not-usds-or-susds");
-        require(facility.gem() == dss.chainlog.getAddress(cfg.gemKey), "NFATInit/gem-mismatch");
+        // Validate the configured gem explicitly
+        require(facility.gem() == cfg.gem, "NFATInit/gem-mismatch");
         require(keccak256(bytes(facility.name()))   == keccak256(bytes(cfg.name)),   "NFATInit/name-mismatch");
         require(keccak256(bytes(facility.symbol())) == keccak256(bytes(cfg.symbol)), "NFATInit/symbol-mismatch");
 
