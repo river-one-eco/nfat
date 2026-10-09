@@ -193,7 +193,6 @@ contract NFATFacilityTest is DssTest {
     }
 
     function testDeployAndInitWithUsdsGem() public {
-
         address f_ = NFATDeploy.deploy(address(this), pauseProxy, "USDS", "UsdsName", "UsdsSymb");
 
         NFATConfig memory cfg = NFATConfig({

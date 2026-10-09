@@ -39,7 +39,6 @@ struct NFATConfig {
     address[] freezers;
 }
 
-// Note: deployment scripts assume L1; adapt for L2
 // Note: `stopped` is initially false
 library NFATInit {
 
