@@ -50,9 +50,9 @@ library NFATInit {
         // Block re-initialization: init is meant for a fresh facility, and a second run could not
         // cleanly re-wire the facility for a different ALMProxy (the previous recipient would
         // remain a bud), so refuse outright.
-        require(facility.recipient() == address(0), "NFATInit/recipient-already-set");
-        require(facility.identityNetwork() == address(0), "NFATInit/identity-network-already-set");
-        require(bytes(facility.baseURI()).length == 0, "NFATInit/base-uri-already-set");
+        require(facility.recipient()             == address(0), "NFATInit/recipient-already-set");
+        require(facility.identityNetwork()       == address(0), "NFATInit/identity-network-already-set");
+        require(bytes(facility.baseURI()).length == 0,          "NFATInit/base-uri-already-set");
 
         // Validate the configured gem explicitly
         require(facility.gem() == cfg.gem, "NFATInit/gem-mismatch");
